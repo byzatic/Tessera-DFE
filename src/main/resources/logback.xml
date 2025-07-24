@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+    <!-- set var for logs home -->
+    <property name="LOG_HOME" value="logs"/>
+
+    <!-- console -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [%X{identificationMessage}] - %msg%n</pattern>
+<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [%X{jpa_like_node_repository}::%X{stageId}:%X{stage}|%X{routine}:%X{routineId}] - %msg%n</pattern>-->
+<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [nodeId=%X{nodeId} jpa_like_node_repository=%X{jpa_like_node_repository} stageId=%X{stageId} stage=%X{stage} routine=%X{routine} routineId=%X{routineId}] - %msg%n</pattern>-->
+        </encoder>
+    </appender>
+
+    <!-- log file will be archived daily or if the file size is larger than 10MB -->
+    <appender name="FILE-AUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/debug.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- rollover daily -->
+            <fileNamePattern>${LOG_HOME}/archived/debug.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <totalSizeCap>20GB</totalSizeCap>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [%X{identificationMessage}] - %msg%n</pattern>
+<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss} - %msg%n</pattern>-->
+        </encoder>
+    </appender>
+
+    <logger name="org.apache.commons.beanutils" level="error" additivity="false">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE-AUDIT"/>
+    </logger>
+
+    <root level="debug">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE-AUDIT"/>
+    </root>
+
+</configuration>
