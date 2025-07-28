@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.github.byzatic.tessera.engine</groupId>
-  <artifactId>Tessera-DFE</artifactId>
+  <artifactId>tessera-dfe</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
@@ -18,9 +18,9 @@
     <fully.qualified.main.class>${project.groupId}.server.App</fully.qualified.main.class>
     <!-- manual versions -->
     <version.slf4j>1.7.25</version.slf4j>
-    <version.logback>1.2.9</version.logback>
+    <version.logback>1.5.13</version.logback>
     <version.junit>4.13.1</version.junit>
-    <version.java_byzatic_commons>ffaafe2f89</version.java_byzatic_commons>
+    <version.java_byzatic_commons>0.0.1</version.java_byzatic_commons>
     <version.mcg3_enginecommon_lib>1.0-SNAPSHOT</version.mcg3_enginecommon_lib>
     <version.mcg3_storageapi_lib>1.0-SNAPSHOT</version.mcg3_storageapi_lib>
     <version.mcg3_service_lib>1.0-SNAPSHOT</version.mcg3_service_lib>
@@ -29,18 +29,15 @@
   </properties>
   <!-- manual set end -->
 
-  <!-- manual repositories -->
-  <repositories>
-    <repository>
-      <id>jitpack.io</id>
-      <url>https://jitpack.io</url>
-    </repository>
-  </repositories>
-  <!-- manual repositories end -->
-
-
   <!-- manual set -->
   <dependencies>
+
+    <!-- https://central.sonatype.com/artifact/io.github.byzatic/java-byzatic-commons/overview -->
+    <dependency>
+      <groupId>io.github.byzatic</groupId>
+      <artifactId>java-byzatic-commons</artifactId>
+      <version>${version.java_byzatic_commons}</version>
+    </dependency>
 
     <dependency>
       <groupId>ru.byzatic.metrics_core</groupId>
@@ -64,12 +61,6 @@
       <groupId>ru.byzatic.metrics_core</groupId>
       <artifactId>mcg3_workflowroutines_lib</artifactId>
       <version>${version.mcg3_workflowroutines_lib}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>com.github.svlassov</groupId>
-      <artifactId>JavaByzaticCommons</artifactId>
-      <version>${version.java_byzatic_commons}</version>
     </dependency>
 
     <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-math3 -->
@@ -109,14 +100,14 @@
     <dependency>
       <groupId>commons-beanutils</groupId>
       <artifactId>commons-beanutils</artifactId>
-      <version>1.9.4</version>
+      <version>1.11.0</version>
     </dependency>
 
     <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 -->
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
-      <version>3.17.0</version>
+      <version>3.18.0</version>
     </dependency>
 
     <dependency>
@@ -320,25 +311,6 @@
 
     </plugins>
   </build>
-  <!-- manual set end -->
-
-
-  <!-- manual set -->
-  <distributionManagement>
-
-    <repository>
-      <id>10.174.18.94</id>
-      <name>Releases</name>
-      <url>${env.MAVEN_REPO_URL}/repository/maven-releases/</url>
-    </repository>
-
-    <snapshotRepository>
-      <id>10.174.18.94</id>
-      <name>Snapshot</name>
-      <url>${env.MAVEN_REPO_URL}/repository/maven-snapshots</url>
-    </snapshotRepository>
-
-  </distributionManagement>
   <!-- manual set end -->
 
   <!-- jpa_like_project_global_repository end -->
