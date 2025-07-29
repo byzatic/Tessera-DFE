@@ -1,6 +1,6 @@
 package io.github.byzatic.tessera.engine.domain.model;
 
-import ru.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.ObjectsUtils;
 
 import java.util.Objects;
 

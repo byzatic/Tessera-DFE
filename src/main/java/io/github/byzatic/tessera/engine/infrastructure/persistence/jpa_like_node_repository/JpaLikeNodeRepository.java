@@ -3,7 +3,7 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_nod
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;

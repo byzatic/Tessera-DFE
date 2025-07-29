@@ -5,10 +5,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.repository.SharedResourcesRepositoryInterface;
-import ru.byzatic.metrics_core.service_lib.api_engine.MCg3ServiceApiInterface;
-import ru.byzatic.metrics_core.service_lib.service.ServiceFactoryInterface;
-import ru.byzatic.metrics_core.service_lib.service.ServiceInterface;
-import ru.byzatic.metrics_core.service_lib.service.health.HealthFlagProxy;
+import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
+import io.github.byzatic.tessera.service.service.ServiceFactoryInterface;
+import io.github.byzatic.tessera.service.service.ServiceInterface;
+import io.github.byzatic.tessera.service.service.health.HealthFlagProxy;
 
 import java.io.File;
 import java.net.URL;

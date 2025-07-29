@@ -1,8 +1,8 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.sheduller;
 
-import ru.byzatic.commons.ObjectsUtils;
-import ru.byzatic.metrics_core.service_lib.service.ServiceInterface;
-import ru.byzatic.metrics_core.service_lib.service.health.HealthFlagProxy;
+import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.tessera.service.service.ServiceInterface;
+import io.github.byzatic.tessera.service.service.health.HealthFlagProxy;
 
 import java.util.Objects;
 import java.util.UUID;

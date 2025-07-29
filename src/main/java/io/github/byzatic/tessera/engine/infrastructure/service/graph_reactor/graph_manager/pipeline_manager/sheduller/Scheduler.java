@@ -2,10 +2,10 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.health.HealthFlagProxy;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.health.HealthFlagState;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagState;
 
 import java.util.*;
 

@@ -5,10 +5,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.repository.SharedResourcesRepositoryInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.api_engine.MCg3WorkflowRoutineApiInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.WorkflowRoutineFactoryInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.health.HealthFlagProxy;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.WorkflowRoutineInterface;
+import io.github.byzatic.tessera.workflowroutine.api_engine.MCg3WorkflowRoutineApiInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineFactoryInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
 
 import java.io.File;
 import java.net.URL;

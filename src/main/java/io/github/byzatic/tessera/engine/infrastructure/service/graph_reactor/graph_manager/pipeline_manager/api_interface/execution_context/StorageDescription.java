@@ -3,8 +3,8 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesItem;
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesOptionsItem;
 import io.github.byzatic.tessera.engine.domain.model.node_global.OptionsItem;
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.StorageDescriptionInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.StorageOptionInterface;
+import io.github.byzatic.tessera.workflowroutine.execution_context.StorageDescriptionInterface;
+import io.github.byzatic.tessera.workflowroutine.execution_context.StorageOptionInterface;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -5,7 +5,7 @@ import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.StagesConsistencyItem;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.StagesDescriptionItem;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.WorkersDescriptionItem;
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.ExecutionContextInterface;
+import io.github.byzatic.tessera.workflowroutine.execution_context.ExecutionContextInterface;
 
 import java.util.List;
 

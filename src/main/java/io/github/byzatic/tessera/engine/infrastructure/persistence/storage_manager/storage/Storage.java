@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.dto.DataValueInterface;
+import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageInterface;
 
 import java.util.*;

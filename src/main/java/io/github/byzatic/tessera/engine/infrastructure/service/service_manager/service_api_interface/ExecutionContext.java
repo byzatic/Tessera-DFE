@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface;
 
-import ru.byzatic.metrics_core.mcg3_enginecommon_lib.logging.MdcContextInterface;
-import ru.byzatic.metrics_core.service_lib.execution_context.ExecutionContextInterface;
+import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
+import io.github.byzatic.tessera.service.execution_context.ExecutionContextInterface;
 
 public class ExecutionContext implements ExecutionContextInterface {
     private MdcContextInterface mdcContextInterface;

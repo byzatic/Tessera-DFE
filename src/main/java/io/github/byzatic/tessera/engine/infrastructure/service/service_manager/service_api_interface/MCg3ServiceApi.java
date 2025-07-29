@@ -1,9 +1,9 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface;
 
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.storageapi.StorageApiInterface;
-import ru.byzatic.metrics_core.service_lib.api_engine.MCg3ServiceApiInterface;
-import ru.byzatic.metrics_core.service_lib.configuration.ServiceConfigurationParameter;
-import ru.byzatic.metrics_core.service_lib.execution_context.ExecutionContextInterface;
+import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
+import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
+import io.github.byzatic.tessera.service.configuration.ServiceConfigurationParameter;
+import io.github.byzatic.tessera.service.execution_context.ExecutionContextInterface;
 
 import java.util.LinkedList;
 import java.util.List;

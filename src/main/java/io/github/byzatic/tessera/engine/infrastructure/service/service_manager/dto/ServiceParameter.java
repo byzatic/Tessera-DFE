@@ -1,6 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.dto;
 
-import ru.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.ObjectsUtils;
 
 import java.util.Objects;
 

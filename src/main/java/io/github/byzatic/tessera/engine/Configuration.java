@@ -1,14 +1,14 @@
 package io.github.byzatic.tessera.engine;
 
+import io.github.byzatic.commons.TempDirectory;
+import io.github.byzatic.tessera.engine.application.commons.logging.MdcEngineContext;
+import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
 import org.apache.commons.configuration2.XMLConfiguration;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.byzatic.commons.TempDirectory;
-import ru.byzatic.metrics_core.mcg3_enginecommon_lib.logging.MdcContextInterface;
-import io.github.byzatic.tessera.engine.application.commons.logging.MdcEngineContext;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -111,15 +111,18 @@ public class Configuration {
         Path defaultDataDirectory = Paths.get(Configuration.WORKING_DIR.resolve("data").toString());
 
         if (propertyDataDirectory != null) {
-            if (! Files.exists(propertyDataDirectory)) throw new ConfigurationException("Property dataDirectory not exists. dataDirectory= "+propertyDataDirectory);
+            if (!Files.exists(propertyDataDirectory))
+                throw new ConfigurationException("Property dataDirectory not exists. dataDirectory= " + propertyDataDirectory);
             result = propertyDataDirectory;
             logger.debug("(property) DATA_DIR = {}", propertyDataDirectory);
         } else if (configDataDirectory != null) {
-            if (! Files.exists(configDataDirectory)) throw new ConfigurationException("Config dataDirectory not exists. dataDirectory= "+configDataDirectory);
+            if (!Files.exists(configDataDirectory))
+                throw new ConfigurationException("Config dataDirectory not exists. dataDirectory= " + configDataDirectory);
             result = configDataDirectory;
             logger.debug("(config) DATA_DIR = {}", configDataDirectory);
         } else {
-            if (! Files.exists(defaultDataDirectory)) throw new ConfigurationException("Default dataDirectory not exists. dataDirectory= "+defaultDataDirectory);
+            if (!Files.exists(defaultDataDirectory))
+                throw new ConfigurationException("Default dataDirectory not exists. dataDirectory= " + defaultDataDirectory);
             result = defaultDataDirectory;
             logger.debug("(default) DATA_DIR = {}", defaultDataDirectory);
         }
@@ -150,15 +153,18 @@ public class Configuration {
         Path defaultServicesPath = PROJECTS_DIR.resolve(PROJECT_NAME).resolve("modules").resolve("services");
 
         if (propertyServicesPath != null) {
-            if (! Files.exists(propertyServicesPath)) throw new ConfigurationException("Property servicesPath not exists. propertyServicesPath= "+propertyServicesPath);
+            if (!Files.exists(propertyServicesPath))
+                throw new ConfigurationException("Property servicesPath not exists. propertyServicesPath= " + propertyServicesPath);
             result = propertyServicesPath;
             logger.debug("(property) PROJECT_SERVICES_PATH = {}", propertyServicesPath);
         } else if (configServicesPath != null) {
-            if (! Files.exists(configServicesPath)) throw new ConfigurationException("Config servicesPath not exists. configServicesPath= "+configServicesPath);
+            if (!Files.exists(configServicesPath))
+                throw new ConfigurationException("Config servicesPath not exists. configServicesPath= " + configServicesPath);
             result = configServicesPath;
             logger.debug("(config) PROJECT_SERVICES_PATH = {}", configServicesPath);
         } else {
-            if (! Files.exists(defaultServicesPath)) throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= "+defaultServicesPath);
+            if (!Files.exists(defaultServicesPath))
+                throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= " + defaultServicesPath);
             result = defaultServicesPath;
             logger.debug("(default) PROJECT_SERVICES_PATH = {}", defaultServicesPath);
         }
@@ -172,21 +178,23 @@ public class Configuration {
         Path defaultWorkflowRoutinesPath = PROJECTS_DIR.resolve(PROJECT_NAME).resolve("modules").resolve("workflow_routines");
 
         if (propertyWorkflowRoutinesPath != null) {
-            if (! Files.exists(propertyWorkflowRoutinesPath)) throw new ConfigurationException("Property workflowRoutinesPath not exists.");
+            if (!Files.exists(propertyWorkflowRoutinesPath))
+                throw new ConfigurationException("Property workflowRoutinesPath not exists.");
             result = propertyWorkflowRoutinesPath;
             logger.debug("(property) PROJECT_WORKFLOW_ROUTINES_PATH = {}", propertyWorkflowRoutinesPath);
         } else if (configWorkflowRoutinesPath != null) {
-            if (! Files.exists(configWorkflowRoutinesPath)) throw new ConfigurationException("Config workflowRoutinesPath not exists.");
+            if (!Files.exists(configWorkflowRoutinesPath))
+                throw new ConfigurationException("Config workflowRoutinesPath not exists.");
             result = configWorkflowRoutinesPath;
             logger.debug("(config) PROJECT_WORKFLOW_ROUTINES_PATH = {}", configWorkflowRoutinesPath);
         } else {
-            if (! Files.exists(defaultWorkflowRoutinesPath)) throw new ConfigurationException("Default workflowRoutinesPath not exists.");
+            if (!Files.exists(defaultWorkflowRoutinesPath))
+                throw new ConfigurationException("Default workflowRoutinesPath not exists.");
             result = defaultWorkflowRoutinesPath;
             logger.debug("(default) PROJECT_WORKFLOW_ROUTINES_PATH = {}", defaultWorkflowRoutinesPath);
         }
         return result;
     }
-
 
 
     static {

@@ -1,10 +1,10 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context;
 
-import ru.byzatic.commons.ObjectsUtils;
-import ru.byzatic.metrics_core.mcg3_enginecommon_lib.logging.MdcContextInterface;
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.exceptions.MCg3ApiOperationIncompleteException;
+import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
+import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.*;
+import io.github.byzatic.tessera.workflowroutine.execution_context.*;
 
 import java.util.List;
 import java.util.Objects;

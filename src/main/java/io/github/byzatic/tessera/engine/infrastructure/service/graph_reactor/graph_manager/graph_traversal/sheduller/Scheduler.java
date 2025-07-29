@@ -2,7 +2,7 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.health.HealthFlag;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.health.HealthStateProxy;

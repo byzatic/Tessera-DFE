@@ -3,11 +3,11 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 import org.apache.commons.math3.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.byzatic.commons.ObjectsUtils;
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.dto.DataValueInterface;
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.dto.StorageItem;
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.exceptions.MCg3ApiOperationIncompleteException;
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.storageapi.StorageApiInterface;
+import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
+import io.github.byzatic.tessera.storageapi.dto.StorageItem;
+import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncompleteException;
+import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;

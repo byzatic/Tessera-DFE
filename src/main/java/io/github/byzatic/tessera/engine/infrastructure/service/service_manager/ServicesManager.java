@@ -17,11 +17,11 @@ import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.s
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.sheduller.JobDetail;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.sheduller.SchedulerInterface;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
-import ru.byzatic.metrics_core.service_lib.api_engine.MCg3ServiceApiInterface;
-import ru.byzatic.metrics_core.service_lib.configuration.ServiceConfigurationParameter;
-import ru.byzatic.metrics_core.service_lib.execution_context.ExecutionContextInterface;
-import ru.byzatic.metrics_core.service_lib.service.ServiceInterface;
-import ru.byzatic.metrics_core.service_lib.service.health.HealthFlagProxy;
+import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
+import io.github.byzatic.tessera.service.configuration.ServiceConfigurationParameter;
+import io.github.byzatic.tessera.service.execution_context.ExecutionContextInterface;
+import io.github.byzatic.tessera.service.service.ServiceInterface;
+import io.github.byzatic.tessera.service.service.health.HealthFlagProxy;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface.ExecutionContext;
 
 import java.util.ArrayList;

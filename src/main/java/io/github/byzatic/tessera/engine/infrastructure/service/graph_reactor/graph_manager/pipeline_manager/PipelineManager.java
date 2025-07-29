@@ -16,10 +16,10 @@ import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gra
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikePipelineRepositoryInterface;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.configuration.ConfigurationParameter;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.health.HealthFlagProxy;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.WorkflowRoutineInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.health.HealthFlagState;
+import io.github.byzatic.tessera.workflowroutine.configuration.ConfigurationParameter;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagState;
 
 import java.util.*;
 import java.util.function.Function;

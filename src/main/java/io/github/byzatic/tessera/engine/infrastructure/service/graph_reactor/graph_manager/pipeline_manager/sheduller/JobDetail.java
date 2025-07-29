@@ -1,8 +1,8 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.sheduller;
 
-import ru.byzatic.commons.ObjectsUtils;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.health.HealthFlagProxy;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.WorkflowRoutineInterface;
+import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
 
 import java.util.Objects;
 import java.util.UUID;

@@ -20,11 +20,7 @@
     <version.slf4j>1.7.25</version.slf4j>
     <version.logback>1.5.13</version.logback>
     <version.junit>4.13.1</version.junit>
-    <version.java_byzatic_commons>0.0.1</version.java_byzatic_commons>
-    <version.mcg3_enginecommon_lib>1.0-SNAPSHOT</version.mcg3_enginecommon_lib>
-    <version.mcg3_storageapi_lib>1.0-SNAPSHOT</version.mcg3_storageapi_lib>
-    <version.mcg3_service_lib>1.0-SNAPSHOT</version.mcg3_service_lib>
-    <version.mcg3_workflowroutines_lib>1.0-SNAPSHOT</version.mcg3_workflowroutines_lib>
+    <version.java_byzatic_commons>0.0.2</version.java_byzatic_commons>
     <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
     <!-- manual versions end -->
   </properties>
@@ -70,30 +66,6 @@
       <groupId>io.github.byzatic</groupId>
       <artifactId>java-byzatic-commons</artifactId>
       <version>${version.java_byzatic_commons}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>ru.byzatic.metrics_core</groupId>
-      <artifactId>mcg3-enginecommon-lib</artifactId>
-      <version>${version.mcg3_enginecommon_lib}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>ru.byzatic.metrics_core</groupId>
-      <artifactId>mcg3_storageapi_lib</artifactId>
-      <version>${version.mcg3_storageapi_lib}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>ru.byzatic.metrics_core</groupId>
-      <artifactId>mcg3_service_lib</artifactId>
-      <version>${version.mcg3_service_lib}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>ru.byzatic.metrics_core</groupId>
-      <artifactId>mcg3_workflowroutines_lib</artifactId>
-      <version>${version.mcg3_workflowroutines_lib}</version>
     </dependency>
 
     <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-math3 -->

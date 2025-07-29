@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context;
 
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.GraphPathInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.PipelineExecutionInfoInterface;
+import io.github.byzatic.tessera.workflowroutine.execution_context.GraphPathInterface;
+import io.github.byzatic.tessera.workflowroutine.execution_context.PipelineExecutionInfoInterface;
 
 import java.util.Objects;
 

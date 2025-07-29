@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.application.commons.logging;
 
 import org.slf4j.MDC;
-import ru.byzatic.metrics_core.mcg3_enginecommon_lib.logging.MdcContextInterface;
+import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
 
 import java.util.HashMap;
 import java.util.Map;

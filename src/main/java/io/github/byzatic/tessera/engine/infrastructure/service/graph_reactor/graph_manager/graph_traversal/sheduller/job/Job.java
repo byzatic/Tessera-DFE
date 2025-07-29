@@ -3,7 +3,7 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversalInterface;

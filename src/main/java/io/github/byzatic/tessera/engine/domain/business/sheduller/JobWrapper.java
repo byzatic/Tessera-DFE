@@ -2,7 +2,7 @@ package io.github.byzatic.tessera.engine.domain.business.sheduller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.byzatic.commons.base_exceptions.OperationIncompleteException;
+import io.github.byzatic.commons.base_exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.App;
 import io.github.byzatic.tessera.engine.Configuration;
 

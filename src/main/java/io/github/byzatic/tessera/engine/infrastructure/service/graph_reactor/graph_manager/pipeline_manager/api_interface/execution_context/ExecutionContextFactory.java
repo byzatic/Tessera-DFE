@@ -1,6 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context;
 
-import ru.byzatic.metrics_core.mcg3_enginecommon_lib.logging.MdcContextInterface;
+import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
@@ -13,7 +13,7 @@ import io.github.byzatic.tessera.engine.domain.model.node_pipeline.WorkersDescri
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesItem;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeGlobalRepositoryInterface;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeProjectGlobalRepositoryInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.*;
+import io.github.byzatic.tessera.workflowroutine.execution_context.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;

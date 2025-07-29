@@ -3,7 +3,7 @@ package io.github.byzatic.tessera.engine.domain.business.sheduller;
 import com.google.errorprone.annotations.ThreadSafe;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 import org.jetbrains.annotations.NotNull;
-import ru.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.ObjectsUtils;
 
 @ThreadSafe
 public class StatusProxy {

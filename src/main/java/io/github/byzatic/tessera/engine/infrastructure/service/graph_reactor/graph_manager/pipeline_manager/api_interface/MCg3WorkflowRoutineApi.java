@@ -1,10 +1,10 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface;
 
-import ru.byzatic.commons.ObjectsUtils;
-import ru.byzatic.metrics_core.mcg3_storageapi_lib.storageapi.StorageApiInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.api_engine.MCg3WorkflowRoutineApiInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.configuration.ConfigurationParameter;
-import ru.byzatic.metrics_core.workflowroutines_lib.execution_context.ExecutionContextInterface;
+import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
+import io.github.byzatic.tessera.workflowroutine.api_engine.MCg3WorkflowRoutineApiInterface;
+import io.github.byzatic.tessera.workflowroutine.configuration.ConfigurationParameter;
+import io.github.byzatic.tessera.workflowroutine.execution_context.ExecutionContextInterface;
 
 import java.util.LinkedList;
 import java.util.List;

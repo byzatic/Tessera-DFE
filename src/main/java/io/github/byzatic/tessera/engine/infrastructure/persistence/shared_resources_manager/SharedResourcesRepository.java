@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.repository.SharedResourcesRepositoryInterface;
-import ru.byzatic.metrics_core.service_lib.service.ServiceFactoryInterface;
-import ru.byzatic.metrics_core.workflowroutines_lib.workflowroutines.WorkflowRoutineFactoryInterface;
+import io.github.byzatic.tessera.service.service.ServiceFactoryInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineFactoryInterface;
 
 import java.io.File;
 import java.net.URL;
