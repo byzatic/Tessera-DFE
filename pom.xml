@@ -25,6 +25,7 @@
     <version.mcg3_storageapi_lib>1.0-SNAPSHOT</version.mcg3_storageapi_lib>
     <version.mcg3_service_lib>1.0-SNAPSHOT</version.mcg3_service_lib>
     <version.mcg3_workflowroutines_lib>1.0-SNAPSHOT</version.mcg3_workflowroutines_lib>
+    <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
     <!-- manual versions end -->
   </properties>
   <!-- manual set end -->
@@ -32,7 +33,39 @@
   <!-- manual set -->
   <dependencies>
 
-    <!-- https://central.sonatype.com/artifact/io.github.byzatic/java-byzatic-commons/overview -->
+    <!-- included in tessera-workflow-toolkit -->
+    <!-- https://central.sonatype.com/artifact/io.github.byzatic/tessera-enginecommon-lib -->
+    <dependency>
+      <groupId>io.github.byzatic</groupId>
+      <artifactId>tessera-enginecommon-lib</artifactId>
+      <version>${version.tessera_workflow_toolkit}</version>
+    </dependency>
+
+    <!-- included in tessera-workflow-toolkit -->
+    <!-- https://central.sonatype.com/artifact/io.github.byzatic/tessera-storageapi-lib -->
+    <dependency>
+      <groupId>io.github.byzatic</groupId>
+      <artifactId>tessera-storageapi-lib</artifactId>
+      <version>${version.tessera_workflow_toolkit}</version>
+    </dependency>
+
+    <!-- included in tessera-workflow-toolkit -->
+    <!-- https://central.sonatype.com/artifact/io.github.byzatic/tessera-service-lib -->
+    <dependency>
+      <groupId>io.github.byzatic</groupId>
+      <artifactId>tessera-service-lib</artifactId>
+      <version>${version.tessera_workflow_toolkit}</version>
+    </dependency>
+
+    <!-- included in tessera-workflow-toolkit -->
+    <!-- https://central.sonatype.com/artifact/io.github.byzatic/tessera-workflowroutine-lib -->
+    <dependency>
+      <groupId>io.github.byzatic</groupId>
+      <artifactId>tessera-workflowroutine-lib</artifactId>
+      <version>${version.tessera_workflow_toolkit}</version>
+    </dependency>
+
+    <!-- https://central.sonatype.com/artifact/io.github.byzatic/java-byzatic-commons -->
     <dependency>
       <groupId>io.github.byzatic</groupId>
       <artifactId>java-byzatic-commons</artifactId>
