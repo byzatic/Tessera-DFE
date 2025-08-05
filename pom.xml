@@ -17,8 +17,8 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <fully.qualified.main.class>${project.groupId}.engine.App</fully.qualified.main.class>
     <!-- manual versions -->
-    <version.slf4j>1.7.25</version.slf4j>
-    <version.logback>1.5.13</version.logback>
+    <version.slf4j>2.0.17</version.slf4j>
+    <version.logback>1.5.18</version.logback>
     <version.junit>4.13.1</version.junit>
     <version.java_byzatic_commons>0.0.2</version.java_byzatic_commons>
     <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
@@ -139,14 +139,12 @@
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-core</artifactId>
       <version>${version.logback}</version>
-      <!--      <scope>test</scope>-->
     </dependency>
 
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <version>${version.logback}</version>
-      <!--      <scope>test</scope>-->
     </dependency>
 
     <dependency>
