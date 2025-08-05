@@ -1,7 +1,10 @@
 version: '3.7'
 services:
-  tessera-dfe:
-    image: byzatic/tessera-data-flow-engine:latest
+  tessera-dfe-develop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: byzatic/tessera-data-flow-engine:develop
     container_name: tessera-data-flow-engine
     ports:
       - "8080:8080"
@@ -20,11 +23,11 @@ services:
         max-file: "10"
         max-size: "10m"
     networks:
-      - 93849dcd429a-tessera-dfe
+      - 93849dcd429a-test-develop-tessera-dfe
 
 networks:
   93849dcd429a-test-develop-tessera-dfe:
-    name: 93849dcd429a-tessera-dfe
+    name: 93849dcd429a-test-develop-tessera-dfe
     external: false
 
 
