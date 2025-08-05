@@ -1,0 +1,33 @@
+version: '3.7'
+services:
+  tessera-dfe:
+    image: byzatic/tessera-data-flow-engine:latest
+    container_name: tessera-data-flow-engine
+    ports:
+      - "8080:8080"
+    volumes:
+      - $PWD/configurations/:/app/configurations/
+      - $PWD/data/source/:/app/data/source_zip
+      - $PWD/logs/:/app/logs/
+    environment:
+      - GRAPH_CALCULATION_CRON_CYCLE=*/10 * * * * ?
+      - XMS=20m
+      - XMX=8192m
+      - DATA_DIR_WATCH_INTERVAL=5
+    logging:
+      driver: json-file
+      options:
+        max-file: "10"
+        max-size: "10m"
+    networks:
+      - 93849dcd429a-tessera-dfe
+
+networks:
+  93849dcd429a-test-develop-tessera-dfe:
+    name: 93849dcd429a-tessera-dfe
+    external: false
+
+
+
+
+
