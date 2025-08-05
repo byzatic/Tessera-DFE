@@ -1,16 +1,3 @@
-
-tests issue
-
-```shell
-
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-
-Process finished with exit code 0
-
-```
-
 To move from MCg3 libs to Tessera libs
 ```shell
 find . -type f \( -name '*.java' -o -name '*.xml' -o -name '*.properties' \) \
