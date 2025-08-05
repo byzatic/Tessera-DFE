@@ -133,9 +133,6 @@ jobs:
       image: quay.io/buildah/stable:latest
       options: --privileged
 
-    env:
-      IMAGE_NAME: docker-raidmetrics-prometheus-exporter
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
