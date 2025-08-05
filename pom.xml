@@ -15,7 +15,7 @@
     <project.java.version>17</project.java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <fully.qualified.main.class>${project.groupId}.server.App</fully.qualified.main.class>
+    <fully.qualified.main.class>${project.groupId}.engine.App</fully.qualified.main.class>
     <!-- manual versions -->
     <version.slf4j>1.7.25</version.slf4j>
     <version.logback>1.5.13</version.logback>

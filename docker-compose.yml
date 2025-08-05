@@ -23,7 +23,7 @@ services:
       - 93849dcd429a-tessera-dfe
 
 networks:
-  93849dcd429a-test-develop-tessera-dfe:
+  93849dcd429a-tessera-dfe:
     name: 93849dcd429a-tessera-dfe
     external: false
 
