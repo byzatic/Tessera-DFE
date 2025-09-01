@@ -20,7 +20,7 @@
     <version.slf4j>2.0.17</version.slf4j>
     <version.logback>1.5.18</version.logback>
     <version.junit>4.13.1</version.junit>
-    <version.java_byzatic_commons>0.0.2</version.java_byzatic_commons>
+    <version.java_byzatic_commons>0.0.6</version.java_byzatic_commons>
     <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
     <!-- manual versions end -->
   </properties>

@@ -75,7 +75,6 @@ public class ApplicationContext {
     public static OrchestrationServiceInterface getDomainLogic() {
         if (orchestrationServiceInterface == null) {
             orchestrationServiceInterface = new OrchestrationService(
-                    getDomainLogicScheduler(),
                     getServiceManager(),
                     getGraphManager()
             );
