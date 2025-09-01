@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.config;
 
 import io.github.byzatic.tessera.engine.Configuration;
-import io.github.byzatic.tessera.engine.domain.business.OrchestrationService;
+import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceV0;
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceInterface;
 import io.github.byzatic.tessera.engine.domain.business.sheduller.Scheduler;
 import io.github.byzatic.tessera.engine.domain.business.sheduller.SchedulerInterface;
@@ -74,7 +74,7 @@ public class ApplicationContext {
 
     public static OrchestrationServiceInterface getDomainLogic() {
         if (orchestrationServiceInterface == null) {
-            orchestrationServiceInterface = new OrchestrationService(
+            orchestrationServiceInterface = new OrchestrationServiceV0(
                     getServiceManager(),
                     getGraphManager()
             );
