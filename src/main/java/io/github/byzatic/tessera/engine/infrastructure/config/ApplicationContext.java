@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.config;
 
 import io.github.byzatic.tessera.engine.Configuration;
-import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceV0;
+import io.github.byzatic.tessera.engine.domain.business.OrchestrationService;
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceInterface;
 import io.github.byzatic.tessera.engine.domain.business.sheduller.Scheduler;
 import io.github.byzatic.tessera.engine.domain.business.sheduller.SchedulerInterface;
@@ -39,6 +39,8 @@ import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gra
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoader;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoaderInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.ServicesManager;
+import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.ServicesManagerFactory;
+import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_loader.ServiceLoader;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_loader.ServiceLoaderInterface;
 
@@ -67,6 +69,7 @@ public class ApplicationContext {
     private static PipelineDaoInterface pipelineDao = null;
     private static ProjectGlobalDaoInterface projectGlobalDao= null;
     private static StructureManagerInterface structureManager= null;
+    private static ServicesManagerFactoryInterface servicesManagerFactory;
 
     static {
         Configuration.MDC_ENGINE_CONTEXT.apply();
@@ -74,8 +77,8 @@ public class ApplicationContext {
 
     public static OrchestrationServiceInterface getDomainLogic() {
         if (orchestrationServiceInterface == null) {
-            orchestrationServiceInterface = new OrchestrationServiceV0(
-                    getServiceManager(),
+            orchestrationServiceInterface = new OrchestrationService(
+                    getServicesManagerFactory(),
                     getGraphManager()
             );
         }
@@ -95,11 +98,22 @@ public class ApplicationContext {
                     getProjectGlobalRepository(),
                     getServiceLoader(),
                     getStorageManager(),
-                    getNodeRepository(),
-                    getServiceManagerScheduler()
+                    getNodeRepository()
             );
         }
         return serviceManager;
+    }
+
+    public static ServicesManagerFactoryInterface getServicesManagerFactory() {
+        if (servicesManagerFactory == null) {
+            servicesManagerFactory = new ServicesManagerFactory(
+                    getProjectGlobalRepository(),
+                    getServiceLoader(),
+                    getStorageManager(),
+                    getNodeRepository()
+            );
+        }
+        return servicesManagerFactory;
     }
 
     public static io.github.byzatic.tessera.engine.infrastructure.service.service_manager.sheduller.SchedulerInterface getServiceManagerScheduler() {
