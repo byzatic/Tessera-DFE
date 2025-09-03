@@ -26,20 +26,42 @@ public class Configuration {
 
     public static final Path CONFIGURATION_FILE_PATH;
 
-    //The cronExpressionString is a string that defines the schedule for periodic tasks using the cron format.
-    //It typically consists of six fields separated by spaces:
-    //  1. Seconds (0–59)
-    //  2. Minutes (0–59)
-    //  3. Hours (0–23)
-    //  4. Day of Month (1–31)
-    //  5. Month (1–12 or JAN–DEC)
-    //  6. Day of Week (0–7 or SUN–SAT, where both 0 and 7 represent Sunday)
-    //Each field can contain specific values, ranges, lists, or wildcards to set the schedule precisely. For example:
-    //    - "0 0/5 * * * ?" runs every 5 minutes.
-    //    - "0 15 10 * * ?" runs at 10:15 AM every day.
-    //    - "0 0 12 1/5 * ?" runs every fifth day at noon.
-    //In Java libraries like Quartz, the cron expression is used to specify when the task should execute, with each
-    //part interpreted in the context of time units from seconds to days of the week.
+    // The cronExpressionString is a string that defines the schedule for periodic tasks using the cron format.
+    // It supports five or six fields separated by spaces. If only five fields are provided, the seconds field
+    // is assumed to be 0. Field order:
+    //   [seconds] minutes hours day-of-month month day-of-week
+    // With 6 fields: sec min hour dom mon dow
+    // With 5 fields:     min hour dom mon dow  (seconds defaults to 0)
+    //
+    // Fields and ranges:
+    //  1. Seconds        (0–59)      — optional; defaults to 0 when omitted
+    //  2. Minutes        (0–59)
+    //  3. Hours          (0–23)
+    //  4. Day of Month   (1–31)
+    //  5. Month          (1–12)
+    //  6. Day of Week    (0–6, where 0 = Sunday)
+    //
+    // Each field can contain specific values, ranges, steps, or lists:
+    //   - "*"            any value
+    //   - "a"            exact value (e.g., 5)
+    //   - "a-b"          inclusive range (e.g., 1-5)
+    //   - "*/n"          step values from the minimum (e.g., "*/15" → 0,15,30,45)
+    //   - "a-b/n"        stepped range (e.g., "10-50/10" → 10,20,30,40,50)
+    //   - "a,b,c"        comma-separated list
+    //
+    // Notes:
+    //   - Day-of-Month AND Day-of-Week must both match (logical AND).
+    //   - Text names (JAN–DEC, SUN–SAT) and Quartz-specific tokens ('?', 'L', 'W', '#') are NOT supported.
+    //   - Ranges are inclusive; steps work with "*" or with an explicit range.
+    //
+    // Examples (equivalents shown with and without the seconds field):
+    //   - "*/5 * * * *"          runs every 5 minutes at second 0.
+    //   - "0 */5 * * * *"        runs every 5 minutes with seconds explicitly set.
+    //   - "15 10 * * *"          runs at 10:15 AM every day.
+    //   - "0 15 10 * * *"        runs at 10:15:00 AM every day.
+    //   - "0 12 1/5 * *"         runs every fifth day of the month at 12:00:00.
+    //   - "0 0 12 * * 1-5"       runs at 12:00:00 Monday–Friday (0=Sun, 1=Mon, …, 6=Sat).
+    //   - "* * * * * *"          runs every second.
     public static final String CRON_EXPRESSION_STRING;
     public static final Boolean INITIALIZE_STORAGE_BY_REQUEST;
     public static final Path DATA_DIR;

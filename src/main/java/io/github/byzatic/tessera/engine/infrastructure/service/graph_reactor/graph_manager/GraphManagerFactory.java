@@ -1,5 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager;
 
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository.GraphManagerNodeRepositoryInterface;
@@ -18,13 +19,16 @@ public final class GraphManagerFactory implements GraphManagerFactoryInterface {
 
     private final GraphManagerNodeRepositoryInterface graphManagerNodeRepository;
     private final PipelineManagerFactoryInterface pipelineManagerFactory;
+    private final StorageManagerInterface storageManager;
 
     public GraphManagerFactory(
+            @NotNull StorageManagerInterface storageManager,
             @NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
             @NotNull PipelineManagerFactoryInterface pipelineManagerFactory
     ) {
         this.graphManagerNodeRepository = Objects.requireNonNull(graphManagerNodeRepository, "graphManagerNodeRepository");
         this.pipelineManagerFactory = Objects.requireNonNull(pipelineManagerFactory, "pipelineManagerFactory");
+        this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
     }
 
     @Override
@@ -42,6 +46,7 @@ public final class GraphManagerFactory implements GraphManagerFactoryInterface {
         Objects.requireNonNull(scheduler, "scheduler");
         // Используем конструктор GraphManager с внешним шедуллером и листнерами
         return new GraphManager(
+                storageManager,
                 graphManagerNodeRepository,
                 pipelineManagerFactory,
                 scheduler,

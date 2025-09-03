@@ -211,6 +211,7 @@ public class ApplicationContext {
     public static GraphManagerFactoryInterface getGraphManagerFactory() {
         if (graphManagerFactory == null) {
             graphManagerFactory = new GraphManagerFactory(
+                    getStorageManager(),
                     getGraphManagerNodeRepository(),
                     getPipelineManagerFactory()
             );

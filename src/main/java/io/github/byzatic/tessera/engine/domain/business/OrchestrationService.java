@@ -1,44 +1,34 @@
 package io.github.byzatic.tessera.engine.domain.business;
 
+import io.github.byzatic.commons.schedulers.cron.CronScheduler;
+import io.github.byzatic.commons.schedulers.cron.CronSchedulerInterface;
+import io.github.byzatic.commons.schedulers.cron.CronTask;
+import io.github.byzatic.commons.schedulers.immediate.*;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.BusinessLogicException;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
-
-import io.github.byzatic.commons.schedulers.immediate.CancellationToken;
-import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;
-import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
-import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
-import io.github.byzatic.commons.schedulers.immediate.JobInfo;
-import io.github.byzatic.commons.schedulers.immediate.JobState;
-import io.github.byzatic.commons.schedulers.immediate.Task;
-
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * OrchestrationService на ImmediateScheduler с корректной обработкой ошибок ServicesManager.
+ * OrchestrationService с поддержкой ImmediateScheduler (сервисы) и CronScheduler (граф).
  *
- * Поведение:
- *  1) Вешает собственный JobEventListener на общий scheduler ДО запуска сервисов.
- *     Пока bootstrapPhase=true — любой фейл задачи считается фатальным (ошибка в сервисах).
- *  2) Создаёт ServicesManager через фабрику и запускает сервисы.
- *     Если listener уже зафиксировал ошибку сервиса — прерываем старт.
- *  3) Создаёт GraphManager через фабрику и планирует единственную задачу graphManager.runGraph().
- *     После планирования графа bootstrapPhase=false — далее слушатель реагирует только на графовую джобу.
- *  4) Дожидается терминального события графа или раннего фатального события с сервисов.
- *  5) Корректно останавливает граф, сервисы и закрывает scheduler.
+ * Новая семантика:
+ *  - serviceManager работает автономно (runAllServices).
+ *  - graphManager.runGraph() вызывается ТОЛЬКО по cron (без обязательного первого немедленного прогона).
+ *  - start() блокируется, пока не произойдёт фатальное событие в listener’ах (error/timeout) ИЛИ пока не будет вызван stop().
+ *  - При фатале start() бросает BusinessLogicException. При stop() — возвращается нормально.
  */
 public final class OrchestrationService implements OrchestrationServiceInterface, AutoCloseable {
 
@@ -48,247 +38,226 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
     private final ServicesManagerFactoryInterface servicesManagerFactory;
     private final GraphManagerFactoryInterface graphManagerFactory;
-    private final ImmediateSchedulerInterface scheduler;
+
+    private final ImmediateSchedulerInterface immediateScheduler;
+    private final CronSchedulerInterface cronScheduler;
+
     private final Duration stopGrace;
+
+    /** Cron выражение для графа. Если null/пусто — граф НЕ планируется. */
+    private volatile @Nullable String graphCron;
 
     private volatile ServicesManagerInterface serviceManager;
     private volatile GraphManagerInterface graphManager;
 
-    private volatile ServiceState state = ServiceState.STARTING;
-    private volatile UUID jobId;
+    private volatile UUID cronGraphJobId;
+
+    private volatile ServiceState state = ServiceState.STOPPED;
+
+    /** Латч для блокировки start() до фатала или остановки. */
+    private final CountDownLatch waitUntilStopOrFatal = new CountDownLatch(1);
+    private final AtomicReference<Throwable> fatalError = new AtomicReference<>(null);
+
+    /** Храним listener’ы, чтобы снять их при stop(). */
+    private JobEventListener immediateListenerRef;
+    private io.github.byzatic.commons.schedulers.cron.JobEventListener cronListenerRef;
+
+    // ----- Конструкторы -----
+
+    public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
+                                @NotNull GraphManagerFactoryInterface graphManagerFactory,
+                                @NotNull ImmediateSchedulerInterface immediateScheduler,
+                                @NotNull CronSchedulerInterface cronScheduler,
+                                @NotNull Duration stopGrace,
+                                @Nullable String graphCron) {
+        this.servicesManagerFactory = servicesManagerFactory;
+        this.graphManagerFactory = graphManagerFactory;
+        this.immediateScheduler = immediateScheduler;
+        this.cronScheduler = cronScheduler;
+        this.stopGrace = stopGrace;
+        this.graphCron = normalizeCron(graphCron);
+    }
 
     public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
                                 @NotNull GraphManagerFactoryInterface graphManagerFactory) {
         this(servicesManagerFactory,
                 graphManagerFactory,
                 new ImmediateScheduler.Builder().defaultGrace(Duration.ofSeconds(10)).build(),
-                Duration.ofSeconds(10));
+                new CronScheduler.Builder().build(),
+                Duration.ofSeconds(10),
+                Configuration.CRON_EXPRESSION_STRING);
     }
 
-    public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
-                                @NotNull GraphManagerFactoryInterface graphManagerFactory,
-                                @NotNull ImmediateSchedulerInterface scheduler,
-                                @NotNull Duration stopGrace) {
-        this.servicesManagerFactory = servicesManagerFactory;
-        this.graphManagerFactory = graphManagerFactory;
-        this.scheduler = scheduler;
-        this.stopGrace = stopGrace;
+    /** Позволяет задать/поменять cron-строку перед start(). */
+    public void setGraphCron(@Nullable String cron) {
+        this.graphCron = normalizeCron(cron);
     }
+
+    private @Nullable String normalizeCron(@Nullable String cron) {
+        return (cron != null && !cron.isBlank()) ? cron : null;
+    }
+
+    public ServiceState state() { return state; }
 
     @Override
     public void start() throws BusinessLogicException {
-        final CountDownLatch finished = new CountDownLatch(1);
-        final AtomicReference<Throwable> terminalError = new AtomicReference<>(null);
-        final AtomicBoolean bootstrapPhase = new AtomicBoolean(true); // до планирования графа
-        final AtomicBoolean listenerRegistered = new AtomicBoolean(false);
-
-        // СВОЙ listener навешиваем напрямую на scheduler (не полагаемся, что фабрики его добавят)
-        JobEventListener listener = new JobEventListener() {
-            private void failEarlyIfBootstrap(UUID id, String reason, Throwable error) {
-                if (bootstrapPhase.get()) {
-                    // фиксируем ошибку сервиса на этапе бутстрапа
-                    if (error != null) {
-                        terminalError.compareAndSet(null, error);
-                    } else {
-                        // попытаемся достать текст ошибки из JobInfo
-                        try {
-                            Optional<JobInfo> oi = scheduler.query(id);
-                            if (oi.isPresent() && oi.get().lastError != null) {
-                                terminalError.compareAndSet(null, new RuntimeException(oi.get().lastError));
-                            } else {
-                                terminalError.compareAndSet(null, new RuntimeException(
-                                        "Service task failed during bootstrap: " + id + " (" + reason + ")"));
-                            }
-                        } catch (Throwable t) {
-                            terminalError.compareAndSet(null, new RuntimeException(
-                                    "Service task failed during bootstrap: " + id + " (" + reason + ")", t));
-                        }
-                    }
-                    finished.countDown();
-                }
-            }
-
-            @Override public void onStart(UUID id) {
-                // Ничего не делаем
-            }
-
-            @Override public void onComplete(UUID id) {
-                // Завершение графа — только если это графовая джоба
-                if (jobId != null && jobId.equals(id)) {
-                    logger.debug("Graph job {} completed", id);
-                    finished.countDown();
-                }
-            }
-
-            @Override public void onError(UUID id, Throwable error) {
-                if (jobId != null && jobId.equals(id)) {
-                    logger.error("Graph job {} failed", id, error);
-                    terminalError.compareAndSet(null, error);
-                    finished.countDown();
-                } else {
-                    // Ошибка НЕ графовой джобы — во время бутстрапа считаем фатальной
-                    failEarlyIfBootstrap(id, "error", error);
-                }
-            }
-
-            @Override public void onTimeout(UUID id) {
-                if (jobId != null && jobId.equals(id)) {
-                    logger.error("Graph job {} timed out", id);
-                    finished.countDown();
-                } else {
-                    failEarlyIfBootstrap(id, "timeout", null);
-                }
-            }
-
-            @Override public void onCancelled(UUID id) {
-                if (jobId != null && jobId.equals(id)) {
-                    logger.warn("Graph job {} cancelled", id);
-                    finished.countDown();
-                } else {
-                    failEarlyIfBootstrap(id, "cancelled", null);
-                }
-            }
-        };
-
-        // Регистрируем listener ДО старта сервисов
-        scheduler.addListener(listener);
-        listenerRegistered.set(true);
-
         try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
             logger.info("OrchestrationService starting...");
             state = ServiceState.STARTING;
 
-            // 1) Создаём и запускаем сервисы (используют Тот же scheduler).
-            this.serviceManager = servicesManagerFactory.create(scheduler /* без лишних листнеров */);
+            // ---- 1) Listener’ы на ImmediateScheduler (ошибки сервисов и любых immediate-задач) ----
+            immediateListenerRef = new JobEventListener() {
+                private void fail(UUID jobId, String reason, Throwable error) {
+                    // Пытаемся извлечь lastError для детализации
+                    Throwable toStore = error;
+                    try {
+                        Optional<JobInfo> oi = immediateScheduler.query(jobId);
+                        if (oi.isPresent() && oi.get().lastError != null) {
+                            toStore = new RuntimeException(oi.get().lastError, error);
+                        }
+                    } catch (Throwable ignored) { /* no-op */ }
+
+                    if (fatalError.compareAndSet(null, (toStore != null ? toStore : new RuntimeException(reason)))) {
+                        logger.error("Fatal from ImmediateScheduler: {} (jobId={})", reason, jobId, toStore);
+                        waitUntilStopOrFatal.countDown();
+                    }
+                }
+
+                @Override public void onError(UUID jobId, Throwable error) { fail(jobId, "Immediate job error", error); }
+                @Override public void onTimeout(UUID jobId)             { fail(jobId, "Immediate job timeout", null); }
+                @Override public void onCancelled(UUID jobId)           { /* отмена не считается фаталом */ }
+                @Override public void onComplete(UUID jobId)            { /* успех — просто лог */ }
+            };
+            immediateScheduler.addListener(immediateListenerRef);
+
+            // ---- 2) Запускаем сервисы (живут автономно) ----
+            this.serviceManager = servicesManagerFactory.create(immediateScheduler);
             serviceManager.runAllServices();
 
-            // Если уже прилетела ранняя ошибка (асинхронно из сервисов) — валим
-            if (terminalError.get() != null) {
-                state = ServiceState.FAULT;
-                throw new BusinessLogicException("Service bootstrap failed", terminalError.get());
+            // ---- 3) Создаём graphManager и (если есть cron) планируем граф ----
+            this.graphManager = graphManagerFactory.create(immediateScheduler);
+
+            final String cron = this.graphCron;
+            if (cron != null) {
+                cronListenerRef = new io.github.byzatic.commons.schedulers.cron.JobEventListener() {
+                    private void fail(UUID jobId, String reason, Throwable error) {
+                        if (fatalError.compareAndSet(null, (error != null ? error : new RuntimeException(reason)))) {
+                            logger.error("Fatal from CronScheduler: {} (jobId={})", reason, jobId, error);
+                            waitUntilStopOrFatal.countDown();
+                        }
+                    }
+                    @Override public void onError(UUID jobId, Throwable error) { fail(jobId, "Cron job error", error); }
+                    @Override public void onTimeout(UUID jobId)               { fail(jobId, "Cron job timeout", null); }
+                    @Override public void onCancelled(UUID jobId)             { /* не фатал */ }
+                    @Override public void onComplete(UUID jobId)              { /* успех — просто лог */ }
+                };
+                cronScheduler.addListener(cronListenerRef);
+
+                CronTask graphCronTask = new CronTask() {
+                    @Override
+                    public void run(io.github.byzatic.commons.schedulers.cron.CancellationToken token) throws Exception {
+                        token.throwIfStopRequested();
+                        try (AutoCloseable ignored2 = Configuration.MDC_ENGINE_CONTEXT.use()) {
+                            graphManager.runGraph();
+                        }
+                        token.throwIfStopRequested();
+                    }
+                    @Override
+                    public void onStopRequested() {
+                        // если появится кооперативная остановка графа — вызвать её здесь
+                    }
+                };
+
+                // Планируем ПОВТОРЯЮЩУЮСЯ задачу по cron:
+                // disallowOverlap=true (никаких пересечений), runImmediately=false (только по расписанию)
+                this.cronGraphJobId = cronScheduler.addJob(cron, graphCronTask, true, true);
+                logger.info("Graph scheduled via CronScheduler: {} (jobId={})", cron, cronGraphJobId);
+            } else {
+                logger.warn("graphCron is not set — graphManager will NOT be scheduled.");
             }
 
-            // 2) Создаём GraphManager (тот же scheduler), планируем его как единственную задачу.
-            this.graphManager = graphManagerFactory.create(scheduler /* без лишних листнеров */);
-
-            Task graphTask = new GraphManagerTask(graphManager);
-            jobId = scheduler.addTask(graphTask);
-
-            // Бутстрап завершён — дальше ошибки НЕ графовых задач пусть обрабатываются их владельцами
-            bootstrapPhase.set(false);
-
+            // ---- 4) Блокируемся до фатала или остановки ----
             state = ServiceState.RUNNING;
+            logger.info("OrchestrationService is RUNNING. Waiting for stop() or fatal error...");
+            waitUntilStopOrFatal.await();
 
-            // 3) Ждём терминального события
-            finished.await();
-
-            // 4) Диагностика финального состояния графа
-            if (jobId != null) {
-                JobInfo info = scheduler.query(jobId).orElse(null);
-                logger.info("Graph job terminal state: {}", info);
-                if (info != null && info.state == JobState.FAILED && terminalError.get() == null && info.lastError != null) {
-                    terminalError.set(new RuntimeException(info.lastError));
-                }
-            }
-
-            if (terminalError.get() != null) {
+            // Если пришёл фатал — бросаем исключение
+            Throwable fatal = fatalError.get();
+            if (fatal != null) {
                 state = ServiceState.FAULT;
-                throw new BusinessLogicException("Graph job failed", terminalError.get());
+                throw new BusinessLogicException("Orchestration fatal error", fatal);
             }
 
-            state = ServiceState.STOPPING;
+            // Иначе — это была штатная остановка
+            logger.info("OrchestrationService stopped gracefully.");
 
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             state = ServiceState.FAULT;
-            throw new BusinessLogicException("Orchestration interrupted", ie);
-        } catch (BusinessLogicException e) {
-            throw e;
+            throw new BusinessLogicException("Interrupted while waiting in start()", ie);
+        } catch (BusinessLogicException ble) {
+            throw ble;
         } catch (Throwable t) {
             state = ServiceState.FAULT;
-            throw new BusinessLogicException("Orchestration fatal error: " + t.getMessage(), t);
-        } finally {
-            // Снимаем listener (если успели навесить)
-            if (listenerRegistered.get()) {
-                try { scheduler.removeListener(listener); } catch (Throwable ignore) {}
-            }
-
-            // Останавливаем граф и сервисы + закрываем шедулер
-            try {
-                if (jobId != null) {
-                    scheduler.stopTask(jobId, stopGrace);
-                    scheduler.removeTask(jobId, stopGrace);
-                }
-            } catch (Throwable t) {
-                logger.warn("Error while stopping graph job: {}", t.toString());
-            }
-
-            try {
-                if (serviceManager != null) {
-                    logger.info("stopAllServices STARTED at {}", Instant.now());
-                    serviceManager.stopAllServices();
-                    logger.info("stopAllServices CANCELLED at {}", Instant.now());
-                }
-            } catch (Throwable t) {
-                logger.warn("Error while stopping services", t);
-            }
-
-            try {
-                scheduler.close();
-            } catch (Exception e) {
-                logger.warn("Error while closing scheduler", e);
-            }
-
-            if (state != ServiceState.FAULT) {
-                state = ServiceState.STOPPED;
-            }
-            logger.info("OrchestrationService stopped with state={}", state);
+            throw new BusinessLogicException("Unexpected orchestration error", t);
         }
     }
 
-    @Override
-    public void close() {
+    /**
+     * Корректная остановка: разблокируем start(), снимаем cron-задачу, останавливаем сервисы и закрываем планировщики.
+     */
+    public void stop() {
+        logger.info("OrchestrationService stopping...");
+        state = ServiceState.STOPPING;
+
+        // Разблокируем start() (если ещё не разблокирован фаталом)
+        waitUntilStopOrFatal.countDown();
+
+        // Снимаем cron-задачу (если была)
         try {
+            UUID jobId = this.cronGraphJobId;
             if (jobId != null) {
-                scheduler.stopTask(jobId, stopGrace);
-                scheduler.removeTask(jobId, stopGrace);
+                try {
+                    cronScheduler.removeJob(jobId, stopGrace);
+                } catch (Throwable t) {
+                    try { cronScheduler.stopJob(jobId, stopGrace); } catch (Throwable ignored) {}
+                } finally {
+                    this.cronGraphJobId = null;
+                }
             }
         } catch (Throwable ignored) {}
+
+        // Снимаем listener’ы
+        try {
+            if (cronListenerRef != null) {
+                cronScheduler.removeListener(cronListenerRef);
+                cronListenerRef = null;
+            }
+        } catch (Throwable ignored) {}
+        try {
+            if (immediateListenerRef != null) {
+                immediateScheduler.removeListener(immediateListenerRef);
+                immediateListenerRef = null;
+            }
+        } catch (Throwable ignored) {}
+
+        // Останавливаем сервисы
         try {
             if (serviceManager != null) {
                 serviceManager.stopAllServices();
             }
         } catch (Throwable ignored) {}
-        try {
-            scheduler.close();
-        } catch (Exception ignored) {}
+
+        // Закрываем шедуллеры
+        try { cronScheduler.close(); } catch (Exception ignored) {}
+        try { immediateScheduler.close(); } catch (Exception ignored) {}
+
         state = ServiceState.STOPPED;
+        logger.info("OrchestrationService is STOPPED.");
     }
 
-    public ServiceState state() {
-        return state;
-    }
-
-    /** Адаптер: GraphManagerInterface -> ImmediateScheduler.Task */
-    private static final class GraphManagerTask implements Task {
-        private final GraphManagerInterface graphManager;
-
-        private GraphManagerTask(GraphManagerInterface graphManager) {
-            this.graphManager = graphManager;
-        }
-
-        @Override
-        public void run(CancellationToken token) throws Exception {
-            token.throwIfStopRequested();
-            try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
-                graphManager.runGraph();
-            }
-            token.throwIfStopRequested();
-        }
-
-        @Override
-        public void onStopRequested() {
-            // Если появится кооперативная остановка графа — вызвать здесь.
-        }
+    @Override
+    public void close() {
+        stop();
     }
 }

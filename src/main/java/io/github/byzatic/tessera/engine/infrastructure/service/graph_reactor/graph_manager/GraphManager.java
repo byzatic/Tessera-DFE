@@ -1,5 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager;
 
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,9 +48,11 @@ public class GraphManager implements GraphManagerInterface {
 
     private final ImmediateSchedulerInterface scheduler;
     private final boolean ownsScheduler;
+    private StorageManagerInterface storageManager;
 
     /** Конструктор с внешним шедуллером (рекомендуемый для совместного использования в оркестрации). */
-    public GraphManager(@NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
+    public GraphManager(@NotNull StorageManagerInterface storageManager,
+                        @NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
                         @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
                         @NotNull ImmediateSchedulerInterface scheduler,
                         JobEventListener... listeners) {
@@ -65,6 +68,7 @@ public class GraphManager implements GraphManagerInterface {
 
         this.scheduler = scheduler;
         this.ownsScheduler = false;
+        this.storageManager = storageManager;
 
         // как и раньше — один traversal на весь менеджер
         this.graphTraversal = new GraphTraversal(graphManagerNodeRepository, pipelineManagerFactory, scheduler);
@@ -182,6 +186,7 @@ public class GraphManager implements GraphManagerInterface {
                 for (UUID id : jobIds) {
                     try { scheduler.removeTask(id); } catch (Throwable ignore) {}
                 }
+                clear();
             }
         } catch (OperationIncompleteException e) {
             throw e;
@@ -192,6 +197,18 @@ public class GraphManager implements GraphManagerInterface {
             if (ownsScheduler) {
                 try { scheduler.close(); } catch (Exception ignored) {}
             }
+            clear();
+        }
+    }
+
+    private void clear() throws OperationIncompleteException {
+        try {
+            this.storageManager.cleanupNodeStorages();
+            logger.debug("StorageManager cleanup complete");
+            this.graphManagerNodeRepository.clearNodeStatuses();
+            logger.debug("GraphManagerNodeRepository cleanup complete");
+        } catch (OperationIncompleteException e) {
+            throw new OperationIncompleteException(e);
         }
     }
 
