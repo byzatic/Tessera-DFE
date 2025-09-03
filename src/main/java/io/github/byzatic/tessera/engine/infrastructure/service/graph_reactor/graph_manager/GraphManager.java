@@ -67,7 +67,7 @@ public class GraphManager implements GraphManagerInterface {
         this.ownsScheduler = false;
 
         // как и раньше — один traversal на весь менеджер
-        this.graphTraversal = new GraphTraversal(graphManagerNodeRepository, pipelineManagerFactory);
+        this.graphTraversal = new GraphTraversal(graphManagerNodeRepository, pipelineManagerFactory, scheduler);
 
         // внешние слушатели (например, бизнес-логика)
         if (listeners != null) {

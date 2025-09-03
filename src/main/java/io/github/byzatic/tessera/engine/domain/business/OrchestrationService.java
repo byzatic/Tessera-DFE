@@ -20,20 +20,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * OrchestrationService — версия на ImmediateScheduler,
- * использующая ServicesManagerFactory и GraphManagerFactory.
+ * OrchestrationService на ImmediateScheduler с корректной обработкой ошибок ServicesManager.
  *
  * Поведение:
- *  1) Создаёт общий ImmediateScheduler.
- *  2) Через ServicesManagerFactory создаёт менеджер сервисов, передавая общий scheduler и listener; запускает сервисы.
- *  3) Через GraphManagerFactory создаёт GraphManager, передавая общий scheduler и listener.
- *  4) Планирует единственную задачу: graphManager.runGraph().
- *  5) Ожидает терминального события графовой задачи и корректно останавливается.
+ *  1) Вешает собственный JobEventListener на общий scheduler ДО запуска сервисов.
+ *     Пока bootstrapPhase=true — любой фейл задачи считается фатальным (ошибка в сервисах).
+ *  2) Создаёт ServicesManager через фабрику и запускает сервисы.
+ *     Если listener уже зафиксировал ошибку сервиса — прерываем старт.
+ *  3) Создаёт GraphManager через фабрику и планирует единственную задачу graphManager.runGraph().
+ *     После планирования графа bootstrapPhase=false — далее слушатель реагирует только на графовую джобу.
+ *  4) Дожидается терминального события графа или раннего фатального события с сервисов.
+ *  5) Корректно останавливает граф, сервисы и закрывает scheduler.
  */
 public final class OrchestrationService implements OrchestrationServiceInterface, AutoCloseable {
 
@@ -52,7 +57,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
     private volatile ServiceState state = ServiceState.STARTING;
     private volatile UUID jobId;
 
-    // Рекомендуемый конструктор: создаём свой scheduler и задаём дефолтный grace
     public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
                                 @NotNull GraphManagerFactoryInterface graphManagerFactory) {
         this(servicesManagerFactory,
@@ -61,7 +65,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
                 Duration.ofSeconds(10));
     }
 
-    // Перегрузка: внешний scheduler и настраиваемый stopGrace
     public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
                                 @NotNull GraphManagerFactoryInterface graphManagerFactory,
                                 @NotNull ImmediateSchedulerInterface scheduler,
@@ -76,73 +79,110 @@ public final class OrchestrationService implements OrchestrationServiceInterface
     public void start() throws BusinessLogicException {
         final CountDownLatch finished = new CountDownLatch(1);
         final AtomicReference<Throwable> terminalError = new AtomicReference<>(null);
+        final AtomicBoolean bootstrapPhase = new AtomicBoolean(true); // до планирования графа
+        final AtomicBoolean listenerRegistered = new AtomicBoolean(false);
 
-        // Единый listener для наблюдения за задачей графа и (опционально) за задачами сервисов.
+        // СВОЙ listener навешиваем напрямую на scheduler (не полагаемся, что фабрики его добавят)
         JobEventListener listener = new JobEventListener() {
-            @Override
-            public void onStart(UUID id) {
-                if (id != null && id.equals(jobId)) {
-                    logger.debug("Graph job {} started", id);
+            private void failEarlyIfBootstrap(UUID id, String reason, Throwable error) {
+                if (bootstrapPhase.get()) {
+                    // фиксируем ошибку сервиса на этапе бутстрапа
+                    if (error != null) {
+                        terminalError.compareAndSet(null, error);
+                    } else {
+                        // попытаемся достать текст ошибки из JobInfo
+                        try {
+                            Optional<JobInfo> oi = scheduler.query(id);
+                            if (oi.isPresent() && oi.get().lastError != null) {
+                                terminalError.compareAndSet(null, new RuntimeException(oi.get().lastError));
+                            } else {
+                                terminalError.compareAndSet(null, new RuntimeException(
+                                        "Service task failed during bootstrap: " + id + " (" + reason + ")"));
+                            }
+                        } catch (Throwable t) {
+                            terminalError.compareAndSet(null, new RuntimeException(
+                                    "Service task failed during bootstrap: " + id + " (" + reason + ")", t));
+                        }
+                    }
+                    finished.countDown();
                 }
             }
 
-            @Override
-            public void onComplete(UUID id) {
-                if (id != null && id.equals(jobId)) {
+            @Override public void onStart(UUID id) {
+                // Ничего не делаем
+            }
+
+            @Override public void onComplete(UUID id) {
+                // Завершение графа — только если это графовая джоба
+                if (jobId != null && jobId.equals(id)) {
                     logger.debug("Graph job {} completed", id);
                     finished.countDown();
                 }
             }
 
-            @Override
-            public void onError(UUID id, Throwable error) {
-                if (id != null && id.equals(jobId)) {
+            @Override public void onError(UUID id, Throwable error) {
+                if (jobId != null && jobId.equals(id)) {
                     logger.error("Graph job {} failed", id, error);
-                    terminalError.set(error);
+                    terminalError.compareAndSet(null, error);
                     finished.countDown();
+                } else {
+                    // Ошибка НЕ графовой джобы — во время бутстрапа считаем фатальной
+                    failEarlyIfBootstrap(id, "error", error);
                 }
             }
 
-            @Override
-            public void onTimeout(UUID id) {
-                if (id != null && id.equals(jobId)) {
+            @Override public void onTimeout(UUID id) {
+                if (jobId != null && jobId.equals(id)) {
                     logger.error("Graph job {} timed out", id);
                     finished.countDown();
+                } else {
+                    failEarlyIfBootstrap(id, "timeout", null);
                 }
             }
 
-            @Override
-            public void onCancelled(UUID id) {
-                if (id != null && id.equals(jobId)) {
+            @Override public void onCancelled(UUID id) {
+                if (jobId != null && jobId.equals(id)) {
                     logger.warn("Graph job {} cancelled", id);
                     finished.countDown();
+                } else {
+                    failEarlyIfBootstrap(id, "cancelled", null);
                 }
             }
         };
+
+        // Регистрируем listener ДО старта сервисов
+        scheduler.addListener(listener);
+        listenerRegistered.set(true);
 
         try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
             logger.info("OrchestrationService starting...");
             state = ServiceState.STARTING;
 
-            // Создаём менеджер сервисов: общий scheduler + listener внутрь
-//            this.serviceManager = servicesManagerFactory.create(scheduler, listener);
-            this.serviceManager = servicesManagerFactory.create(listener);
+            // 1) Создаём и запускаем сервисы (используют Тот же scheduler).
+            this.serviceManager = servicesManagerFactory.create(scheduler /* без лишних листнеров */);
             serviceManager.runAllServices();
 
-            // Создаём GraphManager: общий scheduler + listener внутрь
-//            this.graphManager = graphManagerFactory.create(scheduler, listener);
-            this.graphManager = graphManagerFactory.create(listener);
+            // Если уже прилетела ранняя ошибка (асинхронно из сервисов) — валим
+            if (terminalError.get() != null) {
+                state = ServiceState.FAULT;
+                throw new BusinessLogicException("Service bootstrap failed", terminalError.get());
+            }
 
-            // Планируем единственную доменную задачу — выполнение графа
+            // 2) Создаём GraphManager (тот же scheduler), планируем его как единственную задачу.
+            this.graphManager = graphManagerFactory.create(scheduler /* без лишних листнеров */);
+
             Task graphTask = new GraphManagerTask(graphManager);
             jobId = scheduler.addTask(graphTask);
 
+            // Бутстрап завершён — дальше ошибки НЕ графовых задач пусть обрабатываются их владельцами
+            bootstrapPhase.set(false);
+
             state = ServiceState.RUNNING;
 
-            // Ожидаем терминальное событие
+            // 3) Ждём терминального события
             finished.await();
 
-            // Диагностика финального состояния
+            // 4) Диагностика финального состояния графа
             if (jobId != null) {
                 JobInfo info = scheduler.query(jobId).orElse(null);
                 logger.info("Graph job terminal state: {}", info);
@@ -168,7 +208,12 @@ public final class OrchestrationService implements OrchestrationServiceInterface
             state = ServiceState.FAULT;
             throw new BusinessLogicException("Orchestration fatal error: " + t.getMessage(), t);
         } finally {
-            // Остановка графа и сервисов + закрытие шедуллера
+            // Снимаем listener (если успели навесить)
+            if (listenerRegistered.get()) {
+                try { scheduler.removeListener(listener); } catch (Throwable ignore) {}
+            }
+
+            // Останавливаем граф и сервисы + закрываем шедулер
             try {
                 if (jobId != null) {
                     scheduler.stopTask(jobId, stopGrace);
@@ -180,7 +225,9 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
             try {
                 if (serviceManager != null) {
+                    logger.info("stopAllServices STARTED at {}", Instant.now());
                     serviceManager.stopAllServices();
+                    logger.info("stopAllServices CANCELLED at {}", Instant.now());
                 }
             } catch (Throwable t) {
                 logger.warn("Error while stopping services", t);
@@ -195,7 +242,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
             if (state != ServiceState.FAULT) {
                 state = ServiceState.STOPPED;
             }
-
             logger.info("OrchestrationService stopped with state={}", state);
         }
     }
@@ -243,8 +289,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         @Override
         public void onStopRequested() {
             // Если появится кооперативная остановка графа — вызвать здесь.
-            // Например:
-            // if (graphManager instanceof SupportsStop s) s.requestStop();
         }
     }
 }
