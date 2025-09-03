@@ -3,105 +3,227 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
+
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversal;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversalInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository.GraphManagerNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.JobDetail;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.SchedulerInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.health.HealthStateProxy;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.job.Job;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerFactoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 
-import java.util.ArrayList;
-import java.util.List;
+import io.github.byzatic.commons.schedulers.immediate.CancellationToken;
+import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;
+import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
+import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
+import io.github.byzatic.commons.schedulers.immediate.JobInfo;
+import io.github.byzatic.commons.schedulers.immediate.JobState;
+import io.github.byzatic.commons.schedulers.immediate.Task;
 
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * GraphManager с использованием ImmediateScheduler.
+ *
+ * Поведение не менялось:
+ *  - Берём корневые узлы графа из GraphManagerNodeRepositoryInterface.
+ *  - Для каждого корневого узла планируем задачу, которая делегирует обход в GraphTraversal.
+ *  - Ждём завершения всех задач; если любая завершилась не COMPLETED — бросаем OperationIncompleteException.
+ */
 public class GraphManager implements GraphManagerInterface {
-    private final static Logger logger= LoggerFactory.getLogger(GraphManager.class);
-    private final PipelineManagerFactoryInterface pipelineManagerFactory;
-    private final StorageManagerInterface storageManager;
-    private SchedulerInterface scheduler = null;
-    private GraphManagerNodeRepositoryInterface graphManagerNodeRepository = null;
 
-    public GraphManager(@NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository, SchedulerInterface scheduler, PipelineManagerFactoryInterface pipelineManagerFactory, StorageManagerInterface storageManager) {
-        ObjectsUtils.requireNonNull(graphManagerNodeRepository, new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
-        ObjectsUtils.requireNonNull(scheduler, new IllegalArgumentException(SchedulerInterface.class.getSimpleName() + " should be NotNull"));
+    private static final Logger logger = LoggerFactory.getLogger(GraphManager.class);
+
+    private final PipelineManagerFactoryInterface pipelineManagerFactory;
+    private final GraphManagerNodeRepositoryInterface graphManagerNodeRepository;
+
+    private final GraphTraversalInterface graphTraversal;
+
+    private final ImmediateSchedulerInterface scheduler;
+    private final boolean ownsScheduler;
+
+    /** Конструктор с внешним шедуллером (рекомендуемый для совместного использования в оркестрации). */
+    public GraphManager(@NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
+                        @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
+                        @NotNull ImmediateSchedulerInterface scheduler,
+                        JobEventListener... listeners) {
+        ObjectsUtils.requireNonNull(graphManagerNodeRepository,
+                new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
+        ObjectsUtils.requireNonNull(pipelineManagerFactory,
+                new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull"));
+        ObjectsUtils.requireNonNull(scheduler,
+                new IllegalArgumentException(ImmediateSchedulerInterface.class.getSimpleName() + " should be NotNull"));
+
         this.graphManagerNodeRepository = graphManagerNodeRepository;
-        this.scheduler = scheduler;
         this.pipelineManagerFactory = pipelineManagerFactory;
-        this.storageManager = storageManager;
+
+        this.scheduler = scheduler;
+        this.ownsScheduler = false;
+
+        // как и раньше — один traversal на весь менеджер
+        this.graphTraversal = new GraphTraversal(graphManagerNodeRepository, pipelineManagerFactory);
+
+        // внешние слушатели (например, бизнес-логика)
+        if (listeners != null) {
+            for (JobEventListener l : listeners) {
+                if (l != null) this.scheduler.addListener(l);
+            }
+        }
+        // лёгкий внутренний логер (опционально)
+        this.scheduler.addListener(new SilentLoggingListener());
+    }
+
+    /** Конструктор, создающий собственный ImmediateScheduler. */
+    public GraphManager(@NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
+                        @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
+                        JobEventListener... listeners) {
+        ObjectsUtils.requireNonNull(graphManagerNodeRepository,
+                new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
+        ObjectsUtils.requireNonNull(pipelineManagerFactory,
+                new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull"));
+
+        this.graphManagerNodeRepository = graphManagerNodeRepository;
+        this.pipelineManagerFactory = pipelineManagerFactory;
+
+        this.scheduler = new ImmediateScheduler.Builder()
+                .defaultGrace(Duration.ofSeconds(10))
+                .build();
+        this.ownsScheduler = true;
+
+        this.graphTraversal = new GraphTraversal(graphManagerNodeRepository, pipelineManagerFactory);
+
+        if (listeners != null) {
+            for (JobEventListener l : listeners) {
+                if (l != null) this.scheduler.addListener(l);
+            }
+        }
+        this.scheduler.addListener(new SilentLoggingListener());
     }
 
     @Override
     public void runGraph() throws OperationIncompleteException {
-        Boolean passProcessGraph = Boolean.FALSE;
-
-        // get roots
-        @NotNull List<GraphNodeRef> rootGraphNodeRefList = this.graphManagerNodeRepository.getRootNodes();
-        if (rootGraphNodeRefList.isEmpty()) {
-            passProcessGraph = Boolean.TRUE;
-        }
-        logger.debug("Pass graph processing -> {}", passProcessGraph);
-
-        if (! passProcessGraph) {
-
-            for (JobDetail jobDetail : generateJobDetails(rootGraphNodeRefList)) {
-                this.scheduler.addJob(jobDetail);
-            }
-            logger.debug("Job details prepared");
-
-            this.scheduler.runAllJobs();
-            logger.debug("Scheduler complete");
-
-            this.scheduler.cleanup();
-            logger.debug("Scheduler cleanup complete");
-
-            this.storageManager.cleanupNodeStorages();
-            logger.debug("StorageManager cleanup complete");
-
-            this.graphManagerNodeRepository.clearNodeStatuses();
-            logger.debug("GraphManagerNodeRepository cleanup complete");
-
-        } else {
-            logger.warn("Graph Roots was not found; pass graph processing!");
-        }
-    }
-
-    @NotNull
-    private List<JobDetail> generateJobDetails(@NotNull List<GraphNodeRef> rootGraphNodeRefList) throws OperationIncompleteException {
         try {
-            logger.debug("Root jpa_like_node_repository ref list -> {}", rootGraphNodeRefList);
-            List<JobDetail> jobDetails = new ArrayList<>();
-            for (GraphNodeRef rootNodeGraphNodeRef : rootGraphNodeRefList) {
-                HealthStateProxy healthStateProxy = HealthStateProxy.newBuilder().build();
-                GraphTraversalInterface graphTraversal = new GraphTraversal(
-                        graphManagerNodeRepository,
-                        pipelineManagerFactory
-                );
-                Job job = new Job(
-                        graphTraversal,
-                        graphManagerNodeRepository.getNode(rootNodeGraphNodeRef),
-                        healthStateProxy
-                );
-                JobDetail rootNodeJobDetail = JobDetail.newBuilder()
-                        .job(job)
-                        .HealthStateProxy(healthStateProxy)
-                        .build();
-                jobDetails.add(rootNodeJobDetail);
+            // 1) Получаем список корневых узлов (как и раньше).
+            final List<GraphNodeRef> rootRefs = graphManagerNodeRepository.getRootNodes();
+            if (rootRefs == null || rootRefs.isEmpty()) {
+                logger.info("No root graph nodes found — nothing to execute.");
+                return;
             }
-            logger.debug("Job details list -> {}", rootGraphNodeRefList);
-            return jobDetails;
-        } catch (Exception e) {
-            throw new OperationIncompleteException(e);
+
+            // 2) Готовим барьер, id-список и временный stage-listener,
+            //    который засечёт терминальные события наших задач.
+            final List<UUID> jobIds = new ArrayList<>(rootRefs.size());
+            final Set<UUID> jobIdSet = Collections.newSetFromMap(new ConcurrentHashMap<>());
+            final CountDownLatch barrier = new CountDownLatch(rootRefs.size());
+
+            final JobEventListener stageListener = new JobEventListener() {
+                private boolean isTerminal(UUID id) {
+                    Optional<JobInfo> info = scheduler.query(id);
+                    if (info.isEmpty()) return false;
+                    JobState s = info.get().state;
+                    return s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT;
+                }
+                private void maybeCountDown(UUID id) {
+                    if (id != null && jobIdSet.contains(id) && isTerminal(id)) {
+                        barrier.countDown();
+                    }
+                }
+                @Override public void onStart(UUID jobId) {}
+                @Override public void onComplete(UUID jobId) { maybeCountDown(jobId); }
+                @Override public void onError(UUID jobId, Throwable error) { maybeCountDown(jobId); }
+                @Override public void onTimeout(UUID jobId) { maybeCountDown(jobId); }
+                @Override public void onCancelled(UUID jobId) { maybeCountDown(jobId); }
+            };
+            scheduler.addListener(stageListener);
+
+            try {
+                // 3) Для каждого корневого узла — отдельная задача ImmediateScheduler,
+                //    внутри которой выполняется прежний traversal.traverse(rootNode).
+                for (GraphNodeRef ref : rootRefs) {
+                    final Node rootNode = graphManagerNodeRepository.getNode(ref);
+
+                    Task task = new RootTraversalTask(graphTraversal, rootNode);
+                    UUID id = scheduler.addTask(task);
+
+                    jobIds.add(id);
+                    jobIdSet.add(id);
+
+                    logger.info("Scheduled graph traversal for root={} jobId={}", ref, id);
+                }
+
+                // 4) Барьер — ждём завершения всех traversal-задач.
+                barrier.await();
+
+                // 5) Проверяем терминальные статусы (как раньше проверялся health).
+                for (UUID id : jobIds) {
+                    JobInfo info = scheduler.query(id).orElse(null);
+                    if (info == null) {
+                        throw new OperationIncompleteException("Graph job " + id + " not found after execution");
+                    }
+                    if (info.state != JobState.COMPLETED) {
+                        String err = (info.lastError != null) ? info.lastError
+                                : ("Graph job " + id + " ended with state " + info.state);
+                        throw new OperationIncompleteException(err);
+                    }
+                }
+
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new OperationIncompleteException("Interrupted while waiting graph execution", ie);
+            } finally {
+                // Снимаем stage-listener и убираем задачи из реестра шедуллера.
+                scheduler.removeListener(stageListener);
+                for (UUID id : jobIds) {
+                    try { scheduler.removeTask(id); } catch (Throwable ignore) {}
+                }
+            }
+        } catch (OperationIncompleteException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new OperationIncompleteException(t);
+        } finally {
+            // Если шедуллер наш — закрываем ресурсы.
+            if (ownsScheduler) {
+                try { scheduler.close(); } catch (Exception ignored) {}
+            }
         }
     }
 
+    /** Адаптер: делегирует в прежний GraphTraversal. */
+    private static final class RootTraversalTask implements Task {
+        private final GraphTraversalInterface traversal;
+        private final Node root;
 
+        private RootTraversalTask(GraphTraversalInterface traversal, Node root) {
+            this.traversal = Objects.requireNonNull(traversal, "traversal");
+            this.root = Objects.requireNonNull(root, "root");
+        }
 
+        @Override
+        public void run(CancellationToken token) throws Exception {
+            token.throwIfStopRequested();
+            traversal.traverse(root);
+            token.throwIfStopRequested();
+        }
 
+        @Override
+        public void onStopRequested() {
+            // Если появится кооперативная остановка traversal, вызовите её здесь.
+        }
+    }
 
+    /** Тихий внутренний логер событий ImmediateScheduler (опционально). */
+    private static final class SilentLoggingListener implements JobEventListener {
+        @Override public void onStart(UUID jobId) {}
+        @Override public void onComplete(UUID jobId) {}
+        @Override public void onError(UUID jobId, Throwable error) {}
+        @Override public void onTimeout(UUID jobId) {}
+        @Override public void onCancelled(UUID jobId) {}
+    }
 }

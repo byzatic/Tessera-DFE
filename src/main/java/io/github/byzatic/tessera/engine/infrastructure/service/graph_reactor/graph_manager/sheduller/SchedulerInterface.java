@@ -1,4 +1,4 @@
-package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller;
+package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller;
 
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 

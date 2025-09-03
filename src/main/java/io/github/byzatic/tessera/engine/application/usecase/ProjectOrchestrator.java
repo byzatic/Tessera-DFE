@@ -11,7 +11,7 @@ public class ProjectOrchestrator {
     }
 
     public void orchestrateProject() throws OperationIncompleteException {
-        try {
+        try (orchestrationService) {
             orchestrationService.start();
         } catch (Exception e) {
             throw new OperationIncompleteException(e);

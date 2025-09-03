@@ -7,6 +7,7 @@ import io.github.byzatic.tessera.engine.domain.business.sheduller.Scheduler;
 import io.github.byzatic.tessera.engine.domain.business.sheduller.SchedulerInterface;
 import io.github.byzatic.tessera.engine.domain.repository.*;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.node_global_dao.NodeGlobalDao;
@@ -26,6 +27,7 @@ import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_proj
 import io.github.byzatic.tessera.engine.infrastructure.persistence.shared_resources_manager.SharedResourcesRepository;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageManager;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.GraphManager;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.GraphManagerFactory;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_management.GraphPathManager;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_management.GraphPathManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManager;
@@ -56,7 +58,7 @@ public class ApplicationContext {
     private static JpaLikeNodeRepositoryInterface nodeRepository = null;
     private static GraphManagerInterface graphManager = null;
     private static GraphManagerNodeRepositoryInterface graphManagerNodeRepository = null;
-    private static io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.SchedulerInterface graphManagerScheduler = null;
+    private static io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.SchedulerInterface graphManagerScheduler = null;
     private static PipelineManagerFactoryInterface pipelineManagerFactory = null;
     private static JpaLikePipelineRepositoryInterface pipelineRepository = null;
     private static ModuleLoaderInterface moduleLoader = null;
@@ -70,6 +72,7 @@ public class ApplicationContext {
     private static ProjectGlobalDaoInterface projectGlobalDao= null;
     private static StructureManagerInterface structureManager= null;
     private static ServicesManagerFactoryInterface servicesManagerFactory;
+    private static GraphManagerFactoryInterface graphManagerFactory;
 
     static {
         Configuration.MDC_ENGINE_CONTEXT.apply();
@@ -79,7 +82,7 @@ public class ApplicationContext {
         if (orchestrationServiceInterface == null) {
             orchestrationServiceInterface = new OrchestrationService(
                     getServicesManagerFactory(),
-                    getGraphManager()
+                    getGraphManagerFactory()
             );
         }
         return orchestrationServiceInterface;
@@ -218,12 +221,20 @@ public class ApplicationContext {
         if (graphManager == null) {
             graphManager = new GraphManager(
                     getGraphManagerNodeRepository(),
-                    getGraphManagerScheduler(),
-                    getPipelineManagerFactory(),
-                    getStorageManager()
+                    getPipelineManagerFactory()
             );
         }
         return graphManager;
+    }
+
+    public static GraphManagerFactoryInterface getGraphManagerFactory() {
+        if (graphManagerFactory == null) {
+            graphManagerFactory = new GraphManagerFactory(
+                    getGraphManagerNodeRepository(),
+                    getPipelineManagerFactory()
+            );
+        }
+        return graphManagerFactory;
     }
 
     public static GraphManagerNodeRepositoryInterface getGraphManagerNodeRepository() {
@@ -239,9 +250,9 @@ public class ApplicationContext {
         }
     }
 
-    public static io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.SchedulerInterface getGraphManagerScheduler() {
+    public static io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.SchedulerInterface getGraphManagerScheduler() {
         if (graphManagerScheduler == null) {
-            graphManagerScheduler = new io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.Scheduler();
+            graphManagerScheduler = new io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.Scheduler();
         }
         return graphManagerScheduler;
     }

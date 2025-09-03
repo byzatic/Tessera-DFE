@@ -1,5 +1,7 @@
-package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.job;
+package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.job;
 
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.health.HealthFlag;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.health.HealthStateProxy;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,8 +9,6 @@ import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversalInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.health.HealthFlag;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.health.HealthStateProxy;
 
 public class Job implements JobInterface {
     private final static Logger logger= LoggerFactory.getLogger(Job.class);

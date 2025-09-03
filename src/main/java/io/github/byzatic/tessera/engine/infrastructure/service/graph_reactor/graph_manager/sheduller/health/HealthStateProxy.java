@@ -1,4 +1,4 @@
-package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.health;
+package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.health;
 
 import java.util.Objects;
 

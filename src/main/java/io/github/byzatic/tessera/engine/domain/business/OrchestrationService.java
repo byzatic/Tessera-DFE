@@ -2,8 +2,11 @@ package io.github.byzatic.tessera.engine.domain.business;
 
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.BusinessLogicException;
+import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
+import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
+
 import io.github.byzatic.commons.schedulers.immediate.CancellationToken;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
@@ -11,7 +14,7 @@ import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
 import io.github.byzatic.commons.schedulers.immediate.JobInfo;
 import io.github.byzatic.commons.schedulers.immediate.JobState;
 import io.github.byzatic.commons.schedulers.immediate.Task;
-import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
+
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,14 +25,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * OrchestrationService — версия на ImmediateScheduler с интеграцией нового ServicesManager
- * (внутрь ServicesManager прокидывается внешний JobEventListener).
+ * OrchestrationService — версия на ImmediateScheduler,
+ * использующая ServicesManagerFactory и GraphManagerFactory.
  *
  * Поведение:
- *  - Создаёт/принимает единый ImmediateScheduler.
- *  - Создаёт ServicesManager через фабрику, передавая в него тот же шедуллер и listener.
- *  - Стартует все сервисы и планирует доменную задачу (GraphManager) в тот же шедуллер.
- *  - Ждёт терминального события графовой задачи и выполняет аккуратную остановку.
+ *  1) Создаёт общий ImmediateScheduler.
+ *  2) Через ServicesManagerFactory создаёт менеджер сервисов, передавая общий scheduler и listener; запускает сервисы.
+ *  3) Через GraphManagerFactory создаёт GraphManager, передавая общий scheduler и listener.
+ *  4) Планирует единственную задачу: graphManager.runGraph().
+ *  5) Ожидает терминального события графовой задачи и корректно останавливается.
  */
 public final class OrchestrationService implements OrchestrationServiceInterface, AutoCloseable {
 
@@ -37,35 +41,33 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
     public enum ServiceState { STARTING, RUNNING, STOPPING, STOPPED, FAULT }
 
-    private final GraphManagerInterface graphManager;
+    private final ServicesManagerFactoryInterface servicesManagerFactory;
+    private final GraphManagerFactoryInterface graphManagerFactory;
     private final ImmediateSchedulerInterface scheduler;
     private final Duration stopGrace;
 
-    /** Используем фабрику, чтобы гарантированно передать listener в ServicesManager. */
-    private final ServicesManagerFactoryInterface servicesManagerFactory;
-
-    /** Созданный менеджер сервисов (после start()). */
     private volatile ServicesManagerInterface serviceManager;
+    private volatile GraphManagerInterface graphManager;
 
     private volatile ServiceState state = ServiceState.STARTING;
     private volatile UUID jobId;
 
-    // === Рекомендуемый конструктор: создаём свой scheduler и ServicesManager через фабрику ===
+    // Рекомендуемый конструктор: создаём свой scheduler и задаём дефолтный grace
     public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
-                                @NotNull GraphManagerInterface graphManager) {
+                                @NotNull GraphManagerFactoryInterface graphManagerFactory) {
         this(servicesManagerFactory,
-                graphManager,
+                graphManagerFactory,
                 new ImmediateScheduler.Builder().defaultGrace(Duration.ofSeconds(10)).build(),
                 Duration.ofSeconds(10));
     }
 
-    // === Перегрузка: внешний scheduler и настраиваемый stopGrace ===
+    // Перегрузка: внешний scheduler и настраиваемый stopGrace
     public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
-                                @NotNull GraphManagerInterface graphManager,
+                                @NotNull GraphManagerFactoryInterface graphManagerFactory,
                                 @NotNull ImmediateSchedulerInterface scheduler,
                                 @NotNull Duration stopGrace) {
         this.servicesManagerFactory = servicesManagerFactory;
-        this.graphManager = graphManager;
+        this.graphManagerFactory = graphManagerFactory;
         this.scheduler = scheduler;
         this.stopGrace = stopGrace;
     }
@@ -75,14 +77,12 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         final CountDownLatch finished = new CountDownLatch(1);
         final AtomicReference<Throwable> terminalError = new AtomicReference<>(null);
 
-        // Единый listener для ЧИС и для сервисов (прокинем его внутрь ServicesManager).
+        // Единый listener для наблюдения за задачей графа и (опционально) за задачами сервисов.
         JobEventListener listener = new JobEventListener() {
             @Override
             public void onStart(UUID id) {
                 if (id != null && id.equals(jobId)) {
                     logger.debug("Graph job {} started", id);
-                } else {
-                    logger.debug("Service job {} started", id);
                 }
             }
 
@@ -91,8 +91,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
                 if (id != null && id.equals(jobId)) {
                     logger.debug("Graph job {} completed", id);
                     finished.countDown();
-                } else {
-                    logger.debug("Service job {} completed", id);
                 }
             }
 
@@ -102,8 +100,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
                     logger.error("Graph job {} failed", id, error);
                     terminalError.set(error);
                     finished.countDown();
-                } else {
-                    logger.warn("Service job {} failed", id, error);
                 }
             }
 
@@ -112,8 +108,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
                 if (id != null && id.equals(jobId)) {
                     logger.error("Graph job {} timed out", id);
                     finished.countDown();
-                } else {
-                    logger.warn("Service job {} timed out", id);
                 }
             }
 
@@ -122,33 +116,30 @@ public final class OrchestrationService implements OrchestrationServiceInterface
                 if (id != null && id.equals(jobId)) {
                     logger.warn("Graph job {} cancelled", id);
                     finished.countDown();
-                } else {
-                    logger.info("Service job {} cancelled", id);
                 }
             }
         };
 
-        // listener будет добавлен в шедуллер внутри ServicesManager (через фабрику).
-        // Дополнительно добавлять его здесь НЕ нужно, т.к. ServicesManager использует тот же scheduler.
-
         try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
             logger.info("OrchestrationService starting...");
-
             state = ServiceState.STARTING;
 
-            // Создаём ServicesManager так, чтобы внутрь попал и общий scheduler, и listener.
-            this.serviceManager = servicesManagerFactory.create(scheduler, listener);
-
-            // Стартуем инфраструктурные сервисы (задачи пойдут в Тот же scheduler).
+            // Создаём менеджер сервисов: общий scheduler + listener внутрь
+//            this.serviceManager = servicesManagerFactory.create(scheduler, listener);
+            this.serviceManager = servicesManagerFactory.create(listener);
             serviceManager.runAllServices();
 
-            // Планируем доменную задачу — выполнение графа — в тот же scheduler.
+            // Создаём GraphManager: общий scheduler + listener внутрь
+//            this.graphManager = graphManagerFactory.create(scheduler, listener);
+            this.graphManager = graphManagerFactory.create(listener);
+
+            // Планируем единственную доменную задачу — выполнение графа
             Task graphTask = new GraphManagerTask(graphManager);
             jobId = scheduler.addTask(graphTask);
 
             state = ServiceState.RUNNING;
 
-            // Ждём терминального события по графу.
+            // Ожидаем терминальное событие
             finished.await();
 
             // Диагностика финального состояния
@@ -206,8 +197,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
             }
 
             logger.info("OrchestrationService stopped with state={}", state);
-            // listener удалять здесь не требуется: он добавлялся через ServicesManager и
-            // вместе с закрытием scheduler фактически теряет смысл.
         }
     }
 
@@ -234,9 +223,7 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         return state;
     }
 
-    /**
-     * Адаптер GraphManagerInterface -> Task (ImmediateScheduler).
-     */
+    /** Адаптер: GraphManagerInterface -> ImmediateScheduler.Task */
     private static final class GraphManagerTask implements Task {
         private final GraphManagerInterface graphManager;
 
@@ -255,9 +242,9 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
         @Override
         public void onStopRequested() {
-            // При наличии кооперативной остановки графа — вызвать здесь.
-            // Пример:
-            // if (graphManager instanceof SupportsStop s) { s.requestStop(); }
+            // Если появится кооперативная остановка графа — вызвать здесь.
+            // Например:
+            // if (graphManager instanceof SupportsStop s) s.requestStop();
         }
     }
 }

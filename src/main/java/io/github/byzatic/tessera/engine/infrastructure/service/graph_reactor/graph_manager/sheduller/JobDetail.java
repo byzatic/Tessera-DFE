@@ -1,8 +1,8 @@
-package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller;
+package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller;
 
 import io.github.byzatic.commons.ObjectsUtils;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.health.HealthStateProxy;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.sheduller.job.JobInterface;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.health.HealthStateProxy;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.sheduller.job.JobInterface;
 
 import java.util.Objects;
 import java.util.UUID;
