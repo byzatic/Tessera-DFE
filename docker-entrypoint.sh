@@ -23,7 +23,7 @@ JAVA_OPTS=(
   # TODO: Exception : org.apache.commons.configuration2.ex.ConfigurationException: Property dataDirectory not exists. (default value is incorrect by quoting)
   # -DdataDirectory="${DATA_DIRECTORY:-'/app/data'}"
   # TODO: ${GRAPH_CALCULATION_CRON_CYCLE:-'*/10 * * * * ?'} default value is incorrect by quoting
-  -DgraphCalculationCronCycle="${GRAPH_CALCULATION_CRON_CYCLE:-'*/10 * * * * ?'}"
+  -DgraphCalculationCronCycle="${GRAPH_CALCULATION_CRON_CYCLE:-'*/10 * * * * *'}"
   # TODO: ${INITIALIZE_STORAGE_BY_REQUEST:-'false'} default value is incorrect by quoting
   -DinitializeStorageByRequest="${INITIALIZE_STORAGE_BY_REQUEST:-'false'}"
   # TODO: There is no -DsharedPath arg and EmptyValueDefaults check in engine

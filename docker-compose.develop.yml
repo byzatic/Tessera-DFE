@@ -13,7 +13,7 @@ services:
       - $PWD/data/source/:/app/data/source_zip
       - $PWD/logs/:/app/logs/
     environment:
-      - GRAPH_CALCULATION_CRON_CYCLE=*/10 * * * * ?
+      - GRAPH_CALCULATION_CRON_CYCLE=*/10 * * * * *
       - XMS=20m
       - XMX=8192m
       - DATA_DIR_WATCH_INTERVAL=5
