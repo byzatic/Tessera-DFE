@@ -231,7 +231,7 @@ public class GraphManager implements GraphManagerInterface {
 
         @Override
         public void onStopRequested() {
-            // Если появится кооперативная остановка traversal, вызовите её здесь.
+            traversal.cancel();
         }
     }
 

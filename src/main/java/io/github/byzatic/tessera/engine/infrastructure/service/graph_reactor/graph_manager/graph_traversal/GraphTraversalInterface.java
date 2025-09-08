@@ -5,5 +5,7 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 
 public interface GraphTraversalInterface {
+    void cancel();
+
     void traverse(@NotNull Node root) throws OperationIncompleteException;
 }
