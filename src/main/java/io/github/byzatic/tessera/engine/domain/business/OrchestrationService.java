@@ -99,6 +99,49 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
     public ServiceState state() { return state; }
 
+    private void configureImmediateScheduler() {
+        // ---- 1) Listener’ы на ImmediateScheduler (ошибки сервисов и любых immediate-задач) ----
+        immediateListenerRef = new JobEventListener() {
+            private void fail(UUID jobId, String reason, Throwable error) {
+                // Пытаемся извлечь lastError для детализации
+                Throwable toStore = error;
+                try {
+                    Optional<JobInfo> oi = immediateScheduler.query(jobId);
+                    if (oi.isPresent() && oi.get().lastError != null) {
+                        toStore = new RuntimeException(oi.get().lastError, error);
+                    }
+                } catch (Throwable ignored) { /* no-op */ }
+
+                if (fatalError.compareAndSet(null, (toStore != null ? toStore : new RuntimeException(reason)))) {
+                    logger.error("Fatal from ImmediateScheduler: {} (jobId={})", reason, jobId, toStore);
+                    waitUntilStopOrFatal.countDown();
+                }
+            }
+
+            @Override public void onError(UUID jobId, Throwable error) { fail(jobId, "Immediate job error", error); }
+            @Override public void onTimeout(UUID jobId)             { fail(jobId, "Immediate job timeout", null); }
+            @Override public void onCancelled(UUID jobId)           { /* отмена не считается фаталом */ }
+            @Override public void onComplete(UUID jobId)            { /* успех — просто лог */ }
+        };
+        immediateScheduler.addListener(immediateListenerRef);
+    }
+
+    private void configureCronScheduler() {
+        cronListenerRef = new io.github.byzatic.commons.schedulers.cron.JobEventListener() {
+            private void fail(UUID jobId, String reason, Throwable error) {
+                if (fatalError.compareAndSet(null, (error != null ? error : new RuntimeException(reason)))) {
+                    logger.error("Fatal from CronScheduler: {} (jobId={})", reason, jobId, error);
+                    waitUntilStopOrFatal.countDown();
+                }
+            }
+            @Override public void onError(UUID jobId, Throwable error) { fail(jobId, "Cron job error", error); }
+            @Override public void onTimeout(UUID jobId)               { fail(jobId, "Cron job timeout", null); }
+            @Override public void onCancelled(UUID jobId)             { /* не фатал */ }
+            @Override public void onComplete(UUID jobId)              { /* успех — просто лог */ }
+        };
+        cronScheduler.addListener(cronListenerRef);
+    }
+
     @Override
     public void start() throws BusinessLogicException {
         try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
@@ -106,29 +149,7 @@ public final class OrchestrationService implements OrchestrationServiceInterface
             state = ServiceState.STARTING;
 
             // ---- 1) Listener’ы на ImmediateScheduler (ошибки сервисов и любых immediate-задач) ----
-            immediateListenerRef = new JobEventListener() {
-                private void fail(UUID jobId, String reason, Throwable error) {
-                    // Пытаемся извлечь lastError для детализации
-                    Throwable toStore = error;
-                    try {
-                        Optional<JobInfo> oi = immediateScheduler.query(jobId);
-                        if (oi.isPresent() && oi.get().lastError != null) {
-                            toStore = new RuntimeException(oi.get().lastError, error);
-                        }
-                    } catch (Throwable ignored) { /* no-op */ }
-
-                    if (fatalError.compareAndSet(null, (toStore != null ? toStore : new RuntimeException(reason)))) {
-                        logger.error("Fatal from ImmediateScheduler: {} (jobId={})", reason, jobId, toStore);
-                        waitUntilStopOrFatal.countDown();
-                    }
-                }
-
-                @Override public void onError(UUID jobId, Throwable error) { fail(jobId, "Immediate job error", error); }
-                @Override public void onTimeout(UUID jobId)             { fail(jobId, "Immediate job timeout", null); }
-                @Override public void onCancelled(UUID jobId)           { /* отмена не считается фаталом */ }
-                @Override public void onComplete(UUID jobId)            { /* успех — просто лог */ }
-            };
-            immediateScheduler.addListener(immediateListenerRef);
+            configureImmediateScheduler();
 
             // ---- 2) Запускаем сервисы (живут автономно) ----
             this.serviceManager = servicesManagerFactory.create(immediateScheduler);
@@ -139,19 +160,7 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
             final String cron = this.graphCron;
             if (cron != null) {
-                cronListenerRef = new io.github.byzatic.commons.schedulers.cron.JobEventListener() {
-                    private void fail(UUID jobId, String reason, Throwable error) {
-                        if (fatalError.compareAndSet(null, (error != null ? error : new RuntimeException(reason)))) {
-                            logger.error("Fatal from CronScheduler: {} (jobId={})", reason, jobId, error);
-                            waitUntilStopOrFatal.countDown();
-                        }
-                    }
-                    @Override public void onError(UUID jobId, Throwable error) { fail(jobId, "Cron job error", error); }
-                    @Override public void onTimeout(UUID jobId)               { fail(jobId, "Cron job timeout", null); }
-                    @Override public void onCancelled(UUID jobId)             { /* не фатал */ }
-                    @Override public void onComplete(UUID jobId)              { /* успех — просто лог */ }
-                };
-                cronScheduler.addListener(cronListenerRef);
+                configureCronScheduler();
 
                 CronTask graphCronTask = new CronTask() {
                     @Override
