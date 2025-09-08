@@ -94,7 +94,7 @@ public class Configuration {
 
         String propertyCronExpressionString = System.getProperty("graphCalculationCronCycle", null);
         String configCronExpressionString = config.getString("graphCalculationCronCycle");
-        String defaultCronExpressionString = "0 0/1 * * * ?";
+        String defaultCronExpressionString = "0 0/1 * * * *";
         if (propertyCronExpressionString != null) {
             result = propertyCronExpressionString;
             logger.debug("(property) CRON_EXPRESSION_STRING = {}", propertyCronExpressionString);
