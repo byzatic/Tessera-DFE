@@ -1,6 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager;
 
 import io.github.byzatic.tessera.engine.domain.repository.*;
+import io.github.byzatic.tessera.engine.domain.repository.ResourceManagerInterface;
 
 public class ResourceManager implements ResourceManagerInterface {
     private final ResourceFactoryInterface resourceFactory;

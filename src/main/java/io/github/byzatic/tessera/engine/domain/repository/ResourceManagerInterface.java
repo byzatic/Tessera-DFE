@@ -1,4 +1,4 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager;
+package io.github.byzatic.tessera.engine.domain.repository;
 
 import io.github.byzatic.tessera.engine.domain.repository.ResourcesInterface;
 
