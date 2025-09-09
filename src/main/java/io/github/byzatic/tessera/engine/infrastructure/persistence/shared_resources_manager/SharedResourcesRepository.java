@@ -23,7 +23,7 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
 
     public SharedResourcesRepository(String projectName) throws OperationIncompleteException {
         try {
-            loadSharedResources(projectName);
+            load(projectName);
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
@@ -38,7 +38,7 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
         return lastUrlClassLoader;
     }
 
-    private void loadSharedResources(String projectName) throws OperationIncompleteException {
+    private void load(String projectName) {
         try {
             initPreloadedResources();
 
@@ -59,7 +59,7 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
             }
 
         } catch (Exception e) {
-            throw new OperationIncompleteException(e);
+            throw new RuntimeException(e);
         }
     }
 

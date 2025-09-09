@@ -3,10 +3,10 @@ package io.github.byzatic.tessera.engine.domain.repository;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.project.ProjectGlobal;
 
-public interface JpaLikeProjectGlobalRepositoryInterface {
+public interface JpaLikeProjectGlobalRepositoryInterface extends ResourcesInterface {
     ProjectGlobal getProjectGlobal();
 
-    Boolean isStorageWithId(String storageId);
+    Boolean containsProjectGlobalForStorage(String storageId);
 
-    void reload() throws OperationIncompleteException;
+    void reload();
 }

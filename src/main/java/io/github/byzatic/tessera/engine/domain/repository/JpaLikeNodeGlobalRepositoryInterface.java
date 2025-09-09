@@ -4,10 +4,10 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node_global.NodeGlobal;
 
-public interface JpaLikeNodeGlobalRepositoryInterface {
+public interface JpaLikeNodeGlobalRepositoryInterface extends ResourcesInterface {
     NodeGlobal getNodeGlobal(GraphNodeRef graphNodeRef) throws OperationIncompleteException;
 
     Boolean isStorageWithId(GraphNodeRef graphNodeRef, String storageName);
 
-    void reload() throws OperationIncompleteException;
+    void reload();
 }

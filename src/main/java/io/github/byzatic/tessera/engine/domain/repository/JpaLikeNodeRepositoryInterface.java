@@ -6,8 +6,8 @@ import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 
 import java.util.List;
 
-public interface JpaLikeNodeRepositoryInterface {
-    void reload() throws OperationIncompleteException;
+public interface JpaLikeNodeRepositoryInterface extends ResourcesInterface {
+    void reload();
 
     NodeItem getNode(GraphNodeRef graphNodeRef) throws OperationIncompleteException;
 
