@@ -1,21 +1,29 @@
 <!--
-The graphCalculationCronCycle is a string that defines the schedule for periodic tasks using the cron format.
-It typically consists of six fields separated by spaces:
-  1. Seconds (0–59)
-  2. Minutes (0–59)
-  3. Hours (0–23)
-  4. Day of Month (1–31)
-  5. Month (1–12 or JAN–DEC)
-  6. Day of Week (0–7 or SUN–SAT, where both 0 and 7 represent Sunday)
-Each field can contain specific values, ranges, lists, or wildcards to set the schedule precisely. For example:
-    - "0 0/5 * * * ?" runs every 5 minutes.
-    - "0 15 10 * * ?" runs at 10:15 AM every day.
-    - "0 0 12 1/5 * ?" runs every fifth day at noon.
-In Java libraries like Quartz, the cron expression is used to specify when the task should execute, with each
-part interpreted in the context of time units from seconds to days of the week.
+graphCalculationCronCycle — cron schedule for graphManager.
+
+    Format: 5 or 6 space-separated fields:
+      [seconds] minutes hours day-of-month month day-of-week
+    If only 5 fields are provided, the seconds field defaults to 0.
+
+    Supported tokens per field:
+      * (any), exact numbers (e.g., 5), ranges (a-b), lists (a,b,c),
+      steps (*/n), and stepped ranges (a-b/n).
+    Names (JAN–DEC, SUN–SAT) and Quartz-specific tokens (?, L, W, #) are NOT supported.
+    Day-of-Month AND Day-of-Week must both match (AND semantics).
+    Day-of-Week uses 0–6, where 0 = Sunday.
+
+    Examples:
+      */10 * * * * *    → every 10 seconds
+      0 */5 * * * *     → every 5 minutes (on second 0)
+      0 15 10 * * *     → 10:15:00 every day
+      0 0 12 * * 1-5    → 12:00:00 Monday–Friday (0=Sun…6=Sat)
+
+    NOTE:
+      The Quartz-style value "*/10 * * * * ?" is NOT valid here (the "?" token isn’t supported).
+      Use the 6-field form "*/10 * * * * *" to run every 10 seconds.
 -->
 <Configuration>
-    <graphCalculationCronCycle>0 0/1 * * * ?</graphCalculationCronCycle>
+    <graphCalculationCronCycle>*/10 * * * * *</graphCalculationCronCycle>
     <initializeStorageByRequest>False</initializeStorageByRequest>
     <dataDirectory>/My/Awesome/Data/Directory</dataDirectory>
     <projectName>MyAwesomeProject</projectName>

@@ -1,145 +1,351 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.github.byzatic.commons.schedulers.immediate.*;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.*;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.JpaLikePipelineRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.MCg3WorkflowRoutineApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.StorageApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context.ExecutionContextFactoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoaderInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.sheduller.JobDetail;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.sheduller.Scheduler;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.sheduller.SchedulerInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikePipelineRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.workflowroutine.configuration.ConfigurationParameter;
-import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * PipelineManager rewritten to use ImmediateScheduler.
+ * <p>
+ * Semantics:
+ * - For each stage (by position), all workers are scheduled in parallel.
+ * - We wait until ALL workers in the current stage finish (complete/fail/timeout/cancel),
+ * then verify health flags and proceed to the next stage.
+ * - Unique IDs kept for diagnostics.
+ * <p>
+ * Construction modes:
+ * (1) External scheduler injection (share with orchestration, attach listeners).
+ * (2) Self-hosted scheduler (created internally via Builder).
+ */
 public class PipelineManager implements PipelineManagerInterface {
-    private final static Logger logger= LoggerFactory.getLogger(PipelineManager.class);
-    private final SchedulerInterface scheduler;
-    private GraphNodeRef graphNodeRef = null;
-    private List<GraphNodeRef> pathToCurrentExecutionNodeRef = null;
-    private StorageManagerInterface storageManager = null;
-    private ModuleLoaderInterface moduleLoader = null;
-    private JpaLikePipelineRepositoryInterface pipelineRepository = null;
-    private JpaLikeNodeRepositoryInterface nodeRepository = null;
-    private SupportPathResolver pathResolver = null;
-    private ExecutionContextFactoryInterface executionContextFactory = null;
+    private static final Logger logger = LoggerFactory.getLogger(PipelineManager.class);
 
-    public PipelineManager(GraphNodeRef graphNodeRef, List<GraphNodeRef> pathToCurrentExecutionNodeRef, JpaLikePipelineRepositoryInterface pipelineRepository, JpaLikeNodeRepositoryInterface nodeRepository, ModuleLoaderInterface moduleLoader, StorageManagerInterface storageManager, PathManagerInterface pathManagerInterface, ExecutionContextFactoryInterface executionContextFactory) throws OperationIncompleteException {
-        this.graphNodeRef = graphNodeRef;
-        this.pathToCurrentExecutionNodeRef = pathToCurrentExecutionNodeRef;
-        this.pipelineRepository = pipelineRepository;
-        this.nodeRepository = nodeRepository;
-        this.moduleLoader = moduleLoader;
-        this.storageManager = storageManager;
-        this.scheduler = new Scheduler();
-        this.executionContextFactory = executionContextFactory;
+    private final ImmediateSchedulerInterface scheduler;
+    private final boolean ownsScheduler;
+
+    private final GraphNodeRef graphNodeRef;
+    private final List<GraphNodeRef> pathToCurrentExecutionNodeRef;
+    private final StorageManagerInterface storageManager;
+    private final ModuleLoaderInterface moduleLoader;
+    private final JpaLikePipelineRepositoryInterface pipelineRepository;
+    private final JpaLikeNodeRepositoryInterface nodeRepository;
+    private final SupportPathResolver pathResolver;
+    private final ExecutionContextFactoryInterface executionContextFactory;
+
+    // ===== Constructor with external scheduler (preferred) =====
+    public PipelineManager(GraphNodeRef graphNodeRef,
+                           List<GraphNodeRef> pathToCurrentExecutionNodeRef,
+                           JpaLikePipelineRepositoryInterface pipelineRepository,
+                           JpaLikeNodeRepositoryInterface nodeRepository,
+                           ModuleLoaderInterface moduleLoader,
+                           StorageManagerInterface storageManager,
+                           PathManagerInterface pathManagerInterface,
+                           ExecutionContextFactoryInterface executionContextFactory,
+                           ImmediateSchedulerInterface scheduler,
+                           JobEventListener... listeners) throws OperationIncompleteException {
+        this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
+        this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
+        this.pipelineRepository = Objects.requireNonNull(pipelineRepository, "pipelineRepository");
+        this.nodeRepository = Objects.requireNonNull(nodeRepository, "nodeRepository");
+        this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
+        this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
+        this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.ownsScheduler = false;
         try {
-            this.pathResolver = new SupportPathResolver(pathManagerInterface.getStoragePathByGraphNodeRef(graphNodeRef), pathManagerInterface.getProjectGlobalStorage());
+            Objects.requireNonNull(pathManagerInterface, "pathManagerInterface");
+            this.pathResolver = new SupportPathResolver(
+                    pathManagerInterface.getStoragePathByGraphNodeRef(graphNodeRef),
+                    pathManagerInterface.getProjectGlobalStorage()
+            );
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
+        // external listeners
+        if (listeners != null) {
+            for (JobEventListener l : listeners) {
+                if (l != null) this.scheduler.addListener(l);
+            }
+        }
+        // internal lightweight logger
+        this.scheduler.addListener(new LoggingListener());
+    }
+
+    // ===== Constructor with self-hosted scheduler =====
+    public PipelineManager(GraphNodeRef graphNodeRef,
+                           List<GraphNodeRef> pathToCurrentExecutionNodeRef,
+                           JpaLikePipelineRepositoryInterface pipelineRepository,
+                           JpaLikeNodeRepositoryInterface nodeRepository,
+                           ModuleLoaderInterface moduleLoader,
+                           StorageManagerInterface storageManager,
+                           PathManagerInterface pathManagerInterface,
+                           ExecutionContextFactoryInterface executionContextFactory) throws OperationIncompleteException {
+        this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
+        this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
+        this.pipelineRepository = Objects.requireNonNull(pipelineRepository, "pipelineRepository");
+        this.nodeRepository = Objects.requireNonNull(nodeRepository, "nodeRepository");
+        this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
+        this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
+        this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
+        this.scheduler = new ImmediateScheduler.Builder().defaultGrace(Duration.ofSeconds(10)).build();
+        this.ownsScheduler = true;
+        try {
+            Objects.requireNonNull(pathManagerInterface, "pathManagerInterface");
+            this.pathResolver = new SupportPathResolver(
+                    pathManagerInterface.getStoragePathByGraphNodeRef(graphNodeRef),
+                    pathManagerInterface.getProjectGlobalStorage()
+            );
+        } catch (Exception e) {
+            throw new OperationIncompleteException(e);
+        }
+        this.scheduler.addListener(new LoggingListener());
     }
 
     @Override
     public void runPipeline() throws OperationIncompleteException {
-        logger.debug("Run Pipeline for jpa_like_node_repository {}", nodeRepository.getNode(graphNodeRef).getName());
+        logger.debug("Run Pipeline for node {}", nodeRepository.getNode(graphNodeRef).getName());
 
-        // Sort stagesConsistencyItemList by Position
+        // 1) Sorted stages
         NodePipeline pipeline = pipelineRepository.getPipeline(graphNodeRef);
         List<StagesConsistencyItem> stagesConsistencyItemList = new ArrayList<>(pipeline.getStagesConsistency());
         stagesConsistencyItemList.sort(Comparator.comparingInt(StagesConsistencyItem::getPosition));
         logger.debug("Sort stagesConsistencyItemList by Position complete");
 
-        // Prepare Map<StageId, StagesDescriptionItem>
-        // По идее Редко искать → stream или for; Часто искать → Map. Но мне лень, поэтому Map.
+        // 2) Map<StageId, StagesDescriptionItem>
         List<StagesDescriptionItem> stagesDescriptionItemList = pipeline.getStagesDescription();
         Map<String, StagesDescriptionItem> stageMap = stagesDescriptionItemList.stream()
                 .collect(Collectors.toMap(StagesDescriptionItem::getStageId, Function.identity()));
         logger.debug("Prepare Map<StageId, StagesDescriptionItem> complete");
 
-        // loop over stages
+        // 3) Stage-by-stage execution
         for (StagesConsistencyItem stagesConsistencyItem : stagesConsistencyItemList) {
-            if (! stageMap.containsKey(stagesConsistencyItem.getStageId())) throw new OperationIncompleteException("Stage "+ stagesConsistencyItem.getStageId() + " hasn't description");
+            if (!stageMap.containsKey(stagesConsistencyItem.getStageId())) {
+                throw new OperationIncompleteException("StageId " + stagesConsistencyItem.getStageId() + " hasn't description");
+            }
             StagesDescriptionItem stagesDescriptionItem = stageMap.get(stagesConsistencyItem.getStageId());
             List<WorkersDescriptionItem> workersDescriptionItemList = stagesDescriptionItem.getWorkersDescription();
+            if (workersDescriptionItemList == null || workersDescriptionItemList.isEmpty()) {
+                logger.info("Stage {} has no workers — skipping", stagesDescriptionItem.getStageId());
+                continue;
+            }
 
+            final List<UUID> stageJobs = new ArrayList<>();
+            final Map<UUID, HealthFlagProxy> healthByJob = new ConcurrentHashMap<>();
+            final CountDownLatch stageFinished = new CountDownLatch(workersDescriptionItemList.size());
+            final Set<UUID> stageJobSet = Collections.newSetFromMap(new ConcurrentHashMap<UUID, Boolean>());
 
-            // prepare stage workers' jobs
-            for (WorkersDescriptionItem workersDescriptionItem : workersDescriptionItemList) {
-                String workerName = workersDescriptionItem.getName();
-                String workerDescription = workersDescriptionItem.getDescription();
-                List<ConfigurationFilesItem> workerConfigurationFilesList = workersDescriptionItem.getConfigurationFiles(); // TODO: ConfigurationFile -> ConfigurationParameter
-
-                List<ConfigurationParameter> configurationParameterList = new ArrayList<>();
-                for (ConfigurationFilesItem configurationFilesItem : workerConfigurationFilesList) {
-                    configurationParameterList.add(
-                            ConfigurationParameter.newBuilder()
-                                    // TODO: ConfigurationFile.getDescription() -> ConfigurationParameter.parameterKey()
-                                    .parameterKey(configurationFilesItem.getDescription())
-                                    // TODO: ConfigurationFile.getConfigurationFileId() -> ConfigurationParameter.parameterValue()
-                                    .parameterValue(
-                                            pathResolver.processTemplate(configurationFilesItem.getConfigurationFileId())
-                                    )
-                                    .build()
-                    );
+            // Listener на терминальные события ТОЛЬКО наших джоб стадии
+            final JobEventListener stageListener = new JobEventListener() {
+                private boolean isTerminal(UUID id) {
+                    Optional<JobInfo> info = scheduler.query(id);
+                    if (info.isEmpty()) return false;
+                    JobState s = info.get().state;
+                    return s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT;
                 }
 
-                // uniqueId = node_name-pipeline_stage-module_name-uuid
-                String uniqueId = nodeRepository.getNode(graphNodeRef).getName()
-                        + "-" +
-                        stagesDescriptionItem.getStageId()
-                        + "-" +
-                        workerName
-                        + "-" +
-                        UUID.randomUUID().toString().replace("-", "");
+                private void maybeCountDown(UUID id) {
+                    if (id != null && stageJobSet.contains(id) && isTerminal(id)) {
+                        stageFinished.countDown();
+                    }
+                }
 
-                HealthFlagProxy healthFlagProxy = HealthFlagProxy.newBuilder().build();
+                @Override
+                public void onStart(UUID jobId) {
+                }
 
-                WorkflowRoutineInterface workflowRoutine = moduleLoader.getModule(
-                        workerName,
-                        MCg3WorkflowRoutineApi.newBuilder()
-                                .setStorageApi(
-                                        new StorageApi(storageManager, graphNodeRef, nodeRepository)
-                                )
-                                .setConfigurationParameters(configurationParameterList)
-                                .setExecutionContext(
-                                        this.executionContextFactory.getExecutionContext(graphNodeRef, pathToCurrentExecutionNodeRef, stagesDescriptionItem, workersDescriptionItem, stagesConsistencyItem)
-                                )
-                                .build(),
-                        healthFlagProxy
-                );
+                @Override
+                public void onComplete(UUID jobId) {
+                    maybeCountDown(jobId);
+                }
 
-                scheduler.addJob(
-                        JobDetail.newBuilder()
-                                .job(workflowRoutine)
-                                .healthFlagProxy(healthFlagProxy)
-                                .uniqueId(uniqueId)
-                                .build()
-                );
+                @Override
+                public void onError(UUID jobId, Throwable error) {
+                    maybeCountDown(jobId);
+                }
 
+                @Override
+                public void onTimeout(UUID jobId) {
+                    maybeCountDown(jobId);
+                }
 
+                @Override
+                public void onCancelled(UUID jobId) {
+                    maybeCountDown(jobId);
+                }
+            };
+            scheduler.addListener(stageListener);
+
+            try {
+                // 3.1) enqueue all workers in the stage
+                for (WorkersDescriptionItem workersDescriptionItem : workersDescriptionItemList) {
+                    String workerName = workersDescriptionItem.getName();
+                    String workerDescription = workersDescriptionItem.getDescription();
+                    List<ConfigurationFilesItem> workerConfigurationFilesList = workersDescriptionItem.getConfigurationFiles(); // -> ConfigurationParameter
+
+                    List<ConfigurationParameter> configurationParameterList = new ArrayList<>();
+                    if (workerConfigurationFilesList != null) {
+                        for (ConfigurationFilesItem configurationFilesItem : workerConfigurationFilesList) {
+                            configurationParameterList.add(
+                                    ConfigurationParameter.newBuilder()
+                                            .parameterKey(configurationFilesItem.getDescription())
+                                            .parameterValue(
+                                                    pathResolver.processTemplate(configurationFilesItem.getConfigurationFileId())
+                                            )
+                                            .build()
+                            );
+                        }
+                    }
+
+                    String uniqueId =
+                            stagesDescriptionItem.getStageId()
+                                    + "-" + workerName
+                                    + "-" + UUID.randomUUID().toString().replace("-", "");
+
+                    HealthFlagProxy healthFlagProxy = HealthFlagProxy.newBuilder().build();
+
+                    WorkflowRoutineInterface workflowRoutine = moduleLoader.getModule(
+                            workerName,
+                            MCg3WorkflowRoutineApi.newBuilder()
+                                    .setStorageApi(new StorageApi(storageManager, graphNodeRef, nodeRepository))
+                                    .setConfigurationParameters(configurationParameterList)
+                                    .setExecutionContext(
+                                            this.executionContextFactory.getExecutionContext(
+                                                    graphNodeRef, pathToCurrentExecutionNodeRef, stagesDescriptionItem, workersDescriptionItem, stagesConsistencyItem
+                                            )
+                                    )
+                                    .build(),
+                            healthFlagProxy
+                    );
+
+                    // ImmediateScheduler: Task wrapper
+                    Task task = new WorkflowRoutineTask(workflowRoutine);
+
+                    UUID jobId = scheduler.addTask(task);
+                    stageJobs.add(jobId);
+                    stageJobSet.add(jobId);
+                    healthByJob.put(jobId, healthFlagProxy);
+
+                    logger.info("Scheduled workflowRoutine worker={} stage={} jobId={}",
+                            workerName, stagesDescriptionItem.getStageId(), jobId);
+                }
+
+                // 3.2) wait barrier
+                stageFinished.await();
+
+                // 3.3) post-stage validation
+                for (UUID jobId : stageJobs) {
+                    JobInfo info = scheduler.query(jobId).orElse(null);
+                    if (info == null) {
+                        throw new OperationIncompleteException("Job " + jobId + " not found after stage completion");
+                    }
+                    if (info.state != JobState.COMPLETED) {
+                        String err = (info.lastError != null) ? info.lastError
+                                : ("Job " + jobId + " ended with state " + info.state);
+                        throw new OperationIncompleteException(err);
+                    }
+
+                    HealthFlagProxy h = healthByJob.get(jobId);
+                    if (h == null || h.getHealthFlagState() != HealthFlagState.COMPLETE) {
+                        throw new OperationIncompleteException("Job " + jobId + " is not in COMPLETE health state");
+                    }
+                }
+
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new OperationIncompleteException("Interrupted while waiting stage " + stagesDescriptionItem.getStageId(), ie);
+            } finally {
+                // remove stage listener & cleanup tasks
+                scheduler.removeListener(stageListener);
+                for (UUID id : stageJobs) {
+                    try {
+                        scheduler.removeTask(id);
+                    } catch (Throwable ignore) {
+                    }
+                }
             }
+        }
+    }
 
-            scheduler.runAllJobs(Boolean.TRUE);
-
-            for (JobDetail jobDetail: scheduler.getJobDetails()) {
-                if (scheduler.isJobActive(jobDetail)) throw new OperationIncompleteException("Job " + jobDetail + " has Active state after JoinThreads task completed");
-                if (jobDetail.getHealthFlagProxy().getHealthFlagState() != HealthFlagState.COMPLETE) throw new OperationIncompleteException("Job " + jobDetail + " is not in COMPLETE state");
+    /**
+     * If manager owns scheduler, call to close resources explicitly (optional).
+     */
+    public void close() {
+        if (ownsScheduler) {
+            try {
+                scheduler.close();
+            } catch (Exception ignored) {
             }
+        }
+    }
 
+    /**
+     * Adapter: WorkflowRoutineInterface -> ImmediateScheduler.Task
+     */
+    private static final class WorkflowRoutineTask implements Task {
+        private final WorkflowRoutineInterface routine;
+
+        private WorkflowRoutineTask(WorkflowRoutineInterface routine) {
+            this.routine = Objects.requireNonNull(routine, "routine");
+        }
+
+        @Override
+        public void run(CancellationToken token) throws Exception {
+            token.throwIfStopRequested();
+            routine.run(); // доменная работа рутины
+            token.throwIfStopRequested();
+        }
+
+        @Override
+        public void onStopRequested() {
+            // Если у рутины есть кооперативная остановка — вызвать здесь.
+            // if (routine instanceof SupportsStop s) { s.requestStop(); }
+        }
+    }
+
+    /**
+     * Лёгкий встроенный логирующий слушатель (опционален).
+     */
+    private static final class LoggingListener implements JobEventListener {
+        @Override
+        public void onStart(UUID jobId) {
+        }
+
+        @Override
+        public void onComplete(UUID jobId) {
+        }
+
+        @Override
+        public void onError(UUID jobId, Throwable error) {
+        }
+
+        @Override
+        public void onTimeout(UUID jobId) {
+        }
+
+        @Override
+        public void onCancelled(UUID jobId) {
         }
     }
 }

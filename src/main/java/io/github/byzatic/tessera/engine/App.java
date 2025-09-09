@@ -10,7 +10,7 @@ public class App {
     private final static ProjectOrchestrator projectOrchestrator = new ProjectOrchestrator(ApplicationContext.getDomainLogic());
 
     public static void main( String[] args ) {
-        try {
+        try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
             logger.debug("Run application {} version {}", Configuration.APP_NAME, Configuration.APP_VERSION);
 
             projectOrchestrator.orchestrateProject();
