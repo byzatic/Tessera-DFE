@@ -1,4 +1,4 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.path_manager;
+package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_manager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

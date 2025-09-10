@@ -2,13 +2,11 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.configuratio
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
-import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 import io.github.byzatic.tessera.engine.domain.model.node_global.NodeGlobal;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.path_manager.StructureManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_manager.StructureManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.JpaLikeNodeGlobalRepository;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.NodeGlobalDaoInterface;
 
