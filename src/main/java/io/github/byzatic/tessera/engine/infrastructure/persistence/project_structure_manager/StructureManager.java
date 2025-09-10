@@ -1,4 +1,4 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_manager;
+package io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,5 +55,15 @@ public class StructureManager implements StructureManagerInterface {
         } catch (Exception e) {
             throw new RuntimeException();
         }
+    }
+
+    @Override
+    public void load() {
+        //...
+    }
+
+    @Override
+    public void reload() {
+        //...
     }
 }

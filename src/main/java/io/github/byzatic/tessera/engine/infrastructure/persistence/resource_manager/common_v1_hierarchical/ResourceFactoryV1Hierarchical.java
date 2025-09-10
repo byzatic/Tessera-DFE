@@ -1,17 +1,8 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.common_v1_hierarchical;
 
-import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.repository.*;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.JpaLikeNodeGlobalRepository;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.NodeGlobalDaoInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_repository.JpaLikeNodeRepository;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_repository.ProjectDaoInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_pipeline_repository.JpaLikePipelineRepository;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_pipeline_repository.PipelineDaoInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_project_global_repository.JpaLikeProjectGlobalRepository;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_project_global_repository.ProjectGlobalDaoInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.ResourceFactoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.shared_resources_manager.SharedResourcesRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,25 +13,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ResourceFactoryV1Hierarchical implements ResourceFactoryInterface {
     private final static Logger logger = LoggerFactory.getLogger(ResourceFactoryV1Hierarchical.class);
-    private final NodeGlobalDaoInterface nodeGlobalDao;
-    private final ProjectDaoInterface projectDao;
-    private final PipelineDaoInterface pipelineDao;
-    private final ProjectGlobalDaoInterface projectGlobalDao;
 
-    private enum ResourceId {NODE_GLOBAL_REPOSITORY, NODE_REPOSITORY, PIPELINE_REPOSITORY, PROJECT_GLOBAL_REPOSITORY, SHARED_RESOURCES_REPOSITORY}
+    private enum ResourceId {NODE_GLOBAL_REPOSITORY, NODE_REPOSITORY, PIPELINE_REPOSITORY, PROJECT_GLOBAL_REPOSITORY, SHARED_RESOURCES_REPOSITORY, STRUCTURE_MANAGER}
 
-    private final Map<String, Map<ResourceId, ResourcesInterface>> workflowResourceMap = new ConcurrentHashMap<>();
+    private final Map<String, ResourcesContext> workflowResourceMap = new ConcurrentHashMap<>();
 
-    public ResourceFactoryV1Hierarchical(
-            NodeGlobalDaoInterface nodeGlobalDao,
-            ProjectDaoInterface projectDao,
-            PipelineDaoInterface pipelineDao,
-            ProjectGlobalDaoInterface projectGlobalDao
-    ) {
-        this.nodeGlobalDao = nodeGlobalDao;
-        this.projectDao = projectDao;
-        this.pipelineDao = pipelineDao;
-        this.projectGlobalDao = projectGlobalDao;
+    public ResourceFactoryV1Hierarchical() {
     }
 
     @Override
@@ -69,6 +47,11 @@ public class ResourceFactoryV1Hierarchical implements ResourceFactoryInterface {
     }
 
     @Override
+    public StructureManagerInterface createStructureManager(String projectName) {
+        return (StructureManagerInterface) getResource(projectName, ResourceId.STRUCTURE_MANAGER);
+    }
+
+    @Override
     public List<ResourcesInterface> listResources(String projectName) {
         List<ResourcesInterface> resourcesList = new ArrayList<>();
         resourcesList.add(createNodeGlobalRepository(projectName));
@@ -81,56 +64,45 @@ public class ResourceFactoryV1Hierarchical implements ResourceFactoryInterface {
 
     private ResourcesInterface getResource(String projectName, ResourceId resourceId) {
         ResourcesInterface resource = null;
-        if (workflowResourceMap.containsKey(projectName)) {
-            Map<ResourceId, ResourcesInterface> resourceMap = workflowResourceMap.get(projectName);
-            if (resourceMap.containsKey(resourceId)) {
-                resource = resourceMap.get(resourceId);
-            } else {
-                String errMessage = "Illegal state of resource map for project <" + projectName + ">; Resource <" + resourceId.name() + "> not found";
-                logger.error(errMessage);
-                throw new IllegalStateException(errMessage);
-            }
-        } else {
-            Map<ResourceId, ResourcesInterface> resourceMap = new ConcurrentHashMap<>();
 
-            try {
-                JpaLikeNodeGlobalRepositoryInterface nodeGlobalRepository = new JpaLikeNodeGlobalRepository(
-                        projectName,
-                        nodeGlobalDao
-                );
-                resourceMap.put(ResourceId.NODE_GLOBAL_REPOSITORY, nodeGlobalRepository);
-
-                JpaLikeNodeRepositoryInterface nodeRepository = new JpaLikeNodeRepository(
-                        projectName,
-                        projectDao
-                );
-                resourceMap.put(ResourceId.NODE_REPOSITORY, nodeRepository);
-
-                JpaLikePipelineRepositoryInterface pipelineRepository = new JpaLikePipelineRepository(
-                        projectName,
-                        pipelineDao
-                );
-                resourceMap.put(ResourceId.PIPELINE_REPOSITORY, pipelineRepository);
-
-                JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository = new JpaLikeProjectGlobalRepository(
-                        projectName,
-                        projectGlobalDao
-                );
-                resourceMap.put(ResourceId.PROJECT_GLOBAL_REPOSITORY, projectGlobalRepository);
-
-                SharedResourcesRepositoryInterface sharedResourcesRepository = new SharedResourcesRepository(
-                        projectName
-                );
-                resourceMap.put(ResourceId.SHARED_RESOURCES_REPOSITORY, sharedResourcesRepository);
-            } catch (OperationIncompleteException e) {
-                throw new RuntimeException(e);
-            }
-
-            workflowResourceMap.put(projectName, resourceMap);
-
-            resource = getResource(projectName, resourceId);
+        if (!isResourceExists(projectName, resourceId)) {
+            logger.debug("Resource not exists: {} - {}", projectName, resourceId);
+            createResource(projectName);
         }
+
+        switch (resourceId) {
+            case SHARED_RESOURCES_REPOSITORY -> {
+                resource = workflowResourceMap.get(projectName).getSharedResourcesManager();
+            }
+            case NODE_GLOBAL_REPOSITORY -> {
+                resource = workflowResourceMap.get(projectName).getNodeGlobalRepository();
+            }
+            case NODE_REPOSITORY -> {
+                resource = workflowResourceMap.get(projectName).getNodeRepository();
+            }
+            case PIPELINE_REPOSITORY -> {
+                resource = workflowResourceMap.get(projectName).getPipelineRepository();
+            }
+            case PROJECT_GLOBAL_REPOSITORY -> {
+                resource = workflowResourceMap.get(projectName).getProjectGlobalRepository();
+            }
+            case STRUCTURE_MANAGER -> {
+                resource = workflowResourceMap.get(projectName).getStructureManager();
+            }
+            default -> {
+
+            }
+        }
+
         return resource;
+    }
+
+    private void createResource(String projectName) {
+        workflowResourceMap.put(projectName, new ResourcesContext(projectName));
+    }
+
+    private boolean isResourceExists(String projectName, ResourceId resourceId) {
+        return workflowResourceMap.containsKey(projectName);
     }
 
 }

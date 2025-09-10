@@ -2,6 +2,7 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.resource_man
 
 import io.github.byzatic.tessera.engine.domain.repository.*;
 import io.github.byzatic.tessera.engine.domain.repository.ResourceManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
 
 public class ResourceManager implements ResourceManagerInterface {
     private final ResourceFactoryInterface resourceFactory;
@@ -23,6 +24,8 @@ public class ResourceManager implements ResourceManagerInterface {
             resource = type.cast(resourceFactory.createProjectGlobalRepository(projectName));
         } else if (type.equals(SharedResourcesRepositoryInterface.class)) {
             resource = type.cast(resourceFactory.createSharedResourcesRepository(projectName));
+        } else if (type.equals(StructureManagerInterface.class)) {
+            resource = type.cast(resourceFactory.createStructureManager(projectName));
         } else {
             throw new IllegalArgumentException("Unsupported resource type: " + type.getName());
         }
