@@ -6,8 +6,8 @@ import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.node_pipeline_dao.PipelineDao;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project.ProjectDao;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_global.ProjectGlobalDao;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManager;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureController;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureControllerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.JpaLikeNodeGlobalRepository;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.NodeGlobalDaoInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_repository.JpaLikeNodeRepository;
@@ -28,7 +28,7 @@ public class ResourcesContext {
     private NodeGlobalDaoInterface nodeGlobalDaoInterface = null;
     private PipelineDaoInterface pipelineDao = null;
     private ProjectGlobalDaoInterface projectGlobalDao = null;
-    private StructureManagerInterface structureManager = null;
+    private StructureControllerInterface structureManager = null;
     private String resourcesContextProjectName = null;
 
     static {
@@ -78,10 +78,10 @@ public class ResourcesContext {
         }
     }
 
-    public StructureManagerInterface getStructureManager() {
+    public StructureControllerInterface getStructureManager() {
         try {
             if (structureManager == null) {
-                structureManager = new StructureManager(
+                structureManager = new StructureController(
                         getNodeRepository(),
                         resourcesContextProjectName
                 );
@@ -97,7 +97,8 @@ public class ResourcesContext {
             if (pipelineRepository == null) {
                 pipelineRepository = new JpaLikePipelineRepository(
                         resourcesContextProjectName,
-                        getPipelineDao()
+                        getPipelineDao(),
+                        100L
                 );
             }
             return pipelineRepository;
@@ -111,7 +112,8 @@ public class ResourcesContext {
             if (nodeRepository == null) {
                 nodeRepository = new JpaLikeNodeRepository(
                         resourcesContextProjectName,
-                        getProjectDao()
+                        getProjectDao(),
+                        100L
                 );
             }
             return nodeRepository;
@@ -138,7 +140,8 @@ public class ResourcesContext {
             if (nodeGlobalRepository == null) {
                 nodeGlobalRepository = new JpaLikeNodeGlobalRepository(
                         resourcesContextProjectName,
-                        getNodeGlobalDao()
+                        getNodeGlobalDao(),
+                        100L
                 );
             }
             return nodeGlobalRepository;
@@ -152,7 +155,8 @@ public class ResourcesContext {
             if (projectGlobalRepository == null) {
                 projectGlobalRepository = new JpaLikeProjectGlobalRepository(
                         resourcesContextProjectName,
-                        getProjectGlobalDao()
+                        getProjectGlobalDao(),
+                        100L
                 );
             }
             return projectGlobalRepository;

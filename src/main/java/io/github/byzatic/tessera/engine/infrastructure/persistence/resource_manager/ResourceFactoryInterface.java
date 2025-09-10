@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager;
 
 import io.github.byzatic.tessera.engine.domain.repository.*;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureControllerInterface;
 
 import java.util.List;
 
@@ -16,7 +16,7 @@ public interface ResourceFactoryInterface {
 
     SharedResourcesRepositoryInterface createSharedResourcesRepository(String projectName);
 
-    StructureManagerInterface createStructureManager(String projectName);
+    StructureControllerInterface createStructureManager(String projectName);
 
     List<ResourcesInterface> listResources(String projectName);
 }

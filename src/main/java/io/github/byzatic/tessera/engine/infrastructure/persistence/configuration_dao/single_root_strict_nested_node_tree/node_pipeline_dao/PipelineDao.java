@@ -6,7 +6,7 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.NodePipeline;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureControllerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_pipeline_repository.JpaLikePipelineRepository;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_pipeline_repository.PipelineDaoInterface;
 
@@ -16,10 +16,10 @@ import java.util.Map;
 
 public class PipelineDao implements PipelineDaoInterface {
     private final static Logger logger = LoggerFactory.getLogger(PipelineDao.class);
-    private final StructureManagerInterface structureManager;
+    private final StructureControllerInterface structureManager;
     private JpaLikeNodeRepositoryInterface nodeRepository = null;
 
-    public PipelineDao(JpaLikeNodeRepositoryInterface nodeRepository, StructureManagerInterface structureManager) {
+    public PipelineDao(JpaLikeNodeRepositoryInterface nodeRepository, StructureControllerInterface structureManager) {
         this.nodeRepository = nodeRepository;
         this.structureManager = structureManager;
     }

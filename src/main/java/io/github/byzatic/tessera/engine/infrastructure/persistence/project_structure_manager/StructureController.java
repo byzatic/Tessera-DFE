@@ -9,12 +9,12 @@ import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryI
 
 import java.nio.file.Path;
 
-public class StructureManager implements StructureManagerInterface {
-    private final static Logger logger= LoggerFactory.getLogger(StructureManager.class);
+public class StructureController implements StructureControllerInterface {
+    private final static Logger logger= LoggerFactory.getLogger(StructureController.class);
     private final JpaLikeNodeRepositoryInterface jpaLikeNodeRepository;
     private final Path projectsDirectory;
 
-    public StructureManager(JpaLikeNodeRepositoryInterface jpaLikeNodeRepository, String projectName) {
+    public StructureController(JpaLikeNodeRepositoryInterface jpaLikeNodeRepository, String projectName) {
         this.jpaLikeNodeRepository = jpaLikeNodeRepository;
 
         //TODO: check if exists

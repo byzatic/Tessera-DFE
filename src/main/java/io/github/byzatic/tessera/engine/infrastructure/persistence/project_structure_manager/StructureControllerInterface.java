@@ -3,7 +3,7 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.project_stru
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.repository.ResourcesInterface;
 
-public interface StructureManagerInterface extends ResourcesInterface {
+public interface StructureControllerInterface extends ResourcesInterface {
     NodeStructure getNodeStructure(GraphNodeRef graphNodeRef);
 
     ProjectStructure getProjectStructure();

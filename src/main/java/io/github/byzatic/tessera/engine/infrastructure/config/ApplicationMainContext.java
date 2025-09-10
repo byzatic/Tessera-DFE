@@ -7,12 +7,10 @@ import io.github.byzatic.tessera.engine.domain.repository.*;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManager;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureControllerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.ResourceFactoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.ResourceManager;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.common_v1_hierarchical.ResourceFactoryV1Hierarchical;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.common_v1_hierarchical.ResourcesContext;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageManager;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.GraphManagerFactory;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_management.GraphPathManager;
@@ -180,7 +178,7 @@ public class ApplicationMainContext {
             if (pathManager == null) {
                 pathManager = new PathManager(
                         getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class),
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, StructureManagerInterface.class)
+                        getResourceManager().getResource(Configuration.PROJECT_NAME, StructureControllerInterface.class)
                 );
             }
             return pathManager;

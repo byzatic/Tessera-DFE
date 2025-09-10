@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureControllerInterface;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -16,7 +16,7 @@ public class PathManager implements PathManagerInterface {
     private final Map<GraphNodeRef, Path> nodeGlobalStorageMap = new ConcurrentHashMap<>();
     private Path projectGlobalStorage = null;
 
-    public PathManager(JpaLikeNodeRepositoryInterface nodeRepository, StructureManagerInterface structureManager) throws OperationIncompleteException {
+    public PathManager(JpaLikeNodeRepositoryInterface nodeRepository, StructureControllerInterface structureManager) throws OperationIncompleteException {
         this.projectGlobalStorage = structureManager.getProjectStructure().getProjectConfigurationFilesFolder();
         try {
             for (GraphNodeRef graphNodeRef : nodeRepository.getAllGraphNodeRef()) {

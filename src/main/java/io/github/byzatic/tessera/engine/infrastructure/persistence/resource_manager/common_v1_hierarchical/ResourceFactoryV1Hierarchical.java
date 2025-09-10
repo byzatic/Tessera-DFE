@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.common_v1_hierarchical;
 
 import io.github.byzatic.tessera.engine.domain.repository.*;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureControllerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.resource_manager.ResourceFactoryInterface;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,8 +47,8 @@ public class ResourceFactoryV1Hierarchical implements ResourceFactoryInterface {
     }
 
     @Override
-    public StructureManagerInterface createStructureManager(String projectName) {
-        return (StructureManagerInterface) getResource(projectName, ResourceId.STRUCTURE_MANAGER);
+    public StructureControllerInterface createStructureManager(String projectName) {
+        return (StructureControllerInterface) getResource(projectName, ResourceId.STRUCTURE_MANAGER);
     }
 
     @Override
