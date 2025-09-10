@@ -6,11 +6,11 @@ import org.slf4j.LoggerFactory;
 import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_repository.JpaLikeNodeRepository;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.jpa_like_node_repository.JpaLikeNodeRepository;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.NodeLifecycleState;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
 
 import java.util.ArrayList;
 import java.util.HashMap;

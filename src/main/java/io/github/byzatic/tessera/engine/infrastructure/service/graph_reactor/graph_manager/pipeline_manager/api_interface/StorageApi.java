@@ -10,7 +10,7 @@ import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncomplet
 import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
 import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 

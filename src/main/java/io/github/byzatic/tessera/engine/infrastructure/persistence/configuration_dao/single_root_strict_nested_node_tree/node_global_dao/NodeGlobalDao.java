@@ -1,14 +1,13 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.node_global_dao;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node_global.NodeGlobal;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_manager.StructureControllerInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.JpaLikeNodeGlobalRepository;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_global_repository.NodeGlobalDaoInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.common.NodeToGNRContainer;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_controller.StructureControllerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_loader.NodeGlobalDaoInterface;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -18,22 +17,19 @@ public class NodeGlobalDao implements NodeGlobalDaoInterface {
     private final static Logger logger = LoggerFactory.getLogger(NodeGlobalDao.class);
     private final StructureControllerInterface structureManager;
 
-    private JpaLikeNodeRepositoryInterface nodeRepository = null;
-
-    public NodeGlobalDao(JpaLikeNodeRepositoryInterface nodeRepository, StructureControllerInterface structureManager) {
-        this.nodeRepository = nodeRepository;
+    public NodeGlobalDao(StructureControllerInterface structureManager) {
         this.structureManager = structureManager;
     }
 
     @Override
-    public Map<GraphNodeRef, NodeGlobal> load(String projectName) throws OperationIncompleteException {
+    public Map<GraphNodeRef, NodeGlobal> load(String projectName, NodeToGNRContainer nodeToGNRContainer) throws OperationIncompleteException {
         try {
             Map<GraphNodeRef, NodeGlobal> nodeGlobalMap = new HashMap<>();
-            for (GraphNodeRef graphNodeRef : nodeRepository.getAllGraphNodeRef()) {
+            for (GraphNodeRef graphNodeRef : nodeToGNRContainer.getAllGraphNodeRef()) {
                 Path nodePath = structureManager.getNodeStructure(graphNodeRef).getNodeFolder().resolve("global.json");
                 NodeGlobal nodeGlobal = SupportNodeGlobalLoader.load(nodePath);
                 if (nodeGlobalMap.containsKey(graphNodeRef)) {
-                    String errMessage = "Repository " + JpaLikeNodeGlobalRepository.class.getSimpleName() + " already contains object " + NodeGlobal.class.getSimpleName() + " by identifier " + graphNodeRef;
+                    String errMessage = "Repository " + NodeToGNRContainer.class.getSimpleName() + " already contains object " + NodeGlobal.class.getSimpleName() + " by identifier " + graphNodeRef;
                     logger.error(errMessage);
                     throw new OperationIncompleteException(errMessage);
                 } else {

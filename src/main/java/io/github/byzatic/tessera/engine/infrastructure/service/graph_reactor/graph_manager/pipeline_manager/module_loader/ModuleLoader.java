@@ -4,7 +4,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
-import io.github.byzatic.tessera.engine.domain.repository.SharedResourcesRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.SharedResourcesRepositoryInterface;
 import io.github.byzatic.tessera.workflowroutine.api_engine.MCg3WorkflowRoutineApiInterface;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineFactoryInterface;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;

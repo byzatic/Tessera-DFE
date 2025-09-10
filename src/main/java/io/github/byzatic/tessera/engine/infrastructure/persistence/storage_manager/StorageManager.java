@@ -10,9 +10,9 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeGlobalRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeProjectGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeProjectGlobalRepositoryInterface;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.storage.Storage;
 

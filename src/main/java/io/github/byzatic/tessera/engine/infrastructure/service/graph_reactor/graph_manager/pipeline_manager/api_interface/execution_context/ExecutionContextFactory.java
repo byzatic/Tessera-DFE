@@ -3,7 +3,7 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_management.GraphPathManagerInterface;
 import io.github.byzatic.tessera.engine.application.commons.logging.MdcWorkflowRoutineContext;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
@@ -11,8 +11,8 @@ import io.github.byzatic.tessera.engine.domain.model.node_pipeline.StagesConsist
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.StagesDescriptionItem;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.WorkersDescriptionItem;
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeGlobalRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeProjectGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeProjectGlobalRepositoryInterface;
 import io.github.byzatic.tessera.workflowroutine.execution_context.*;
 
 import java.util.ArrayList;

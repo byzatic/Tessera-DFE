@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager;
 
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeProjectGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeProjectGlobalRepositoryInterface;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;

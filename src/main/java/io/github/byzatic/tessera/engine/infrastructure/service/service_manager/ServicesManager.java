@@ -7,8 +7,8 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import io.github.byzatic.tessera.engine.application.commons.logging.MdcServiceContext;
 import io.github.byzatic.tessera.engine.domain.model.project.ServiceItem;
 import io.github.byzatic.tessera.engine.domain.model.project.ServicesOptionsItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeProjectGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeProjectGlobalRepositoryInterface;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.dto.ServiceDescriptor;
@@ -35,7 +35,6 @@ import io.github.byzatic.commons.schedulers.immediate.Task;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 

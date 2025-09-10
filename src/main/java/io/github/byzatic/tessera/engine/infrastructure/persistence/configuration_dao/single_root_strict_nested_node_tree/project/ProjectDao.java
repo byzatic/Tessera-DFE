@@ -8,7 +8,7 @@ import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 import io.github.byzatic.tessera.engine.domain.model.node.Project;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project.dto.ConfigProject;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.jpa_like_node_repository.ProjectDaoInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_loader.ProjectDaoInterface;
 
 import java.io.FileReader;
 import java.nio.file.Path;
@@ -19,6 +19,8 @@ public class ProjectDao implements ProjectDaoInterface {
     private final static Gson gson = new Gson();
     private final SupportNodesStructureCompressor supportNodesStructureCompressor = new SupportNodesStructureCompressor();
 
+    public ProjectDao() {
+    }
 
     @Override
     public Project load(Path projectFile) throws OperationIncompleteException {
