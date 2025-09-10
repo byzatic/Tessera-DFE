@@ -19,26 +19,20 @@ public class Storage<T extends DataValueInterface> implements StorageInterface<T
     private Map<String, T> storage = new ConcurrentHashMap<>();
 
     public Storage(@NotNull String storageId) throws OperationIncompleteException {
-        if (storageId == null) throw new OperationIncompleteException("Storage Id should be not null");
         this.storageId = storageId;
     }
 
     public Storage(@NotNull String storageId, @NotNull Map<String, T> storageMap) throws OperationIncompleteException {
-        if (storageId == null) throw new OperationIncompleteException("Storage Id should be not null");
-        if (storage == null) throw new OperationIncompleteException("Storage should be not null");
         this.storageId = storageId;
         this.storage = storageMap;
     }
 
     public Storage(@NotNull Storage<T> storage) throws OperationIncompleteException {
-        if (storage == null) throw new OperationIncompleteException("Storage should be not null");
         this.storageId = storage.storageId;
         this.storage = storage.storage;
     }
 
     public Storage(@NotNull String storageId, @NotNull Storage<T> storage) throws OperationIncompleteException {
-        if (storageId == null) throw new OperationIncompleteException("Storage Id should be not null");
-        if (storage == null) throw new OperationIncompleteException("Storage should be not null");
         this.storageId = storageId;
         this.storage = storage.storage;
     }
@@ -58,7 +52,6 @@ public class Storage<T extends DataValueInterface> implements StorageInterface<T
 
     @Override
     public void create(@NotNull DataLookupIdentifierImpl storageItemIdI, @NotNull T item) throws OperationIncompleteException {
-        if (item == null) throw new IllegalArgumentException("Item must not be null");
         String id = getId(storageItemIdI);
         if (storage.containsKey(id)) {
             throw new OperationIncompleteException("Item with ID already exists: " + id);
@@ -74,7 +67,6 @@ public class Storage<T extends DataValueInterface> implements StorageInterface<T
 
     @Override
     public @NotNull Boolean update(@NotNull DataLookupIdentifierImpl storageItemIdI, @NotNull T item) throws OperationIncompleteException {
-        if (item == null) throw new IllegalArgumentException("Item must not be null");
         String id = getId(storageItemIdI);
         if (storage.containsKey(id)) {
             storage.put(id, item);
