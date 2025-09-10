@@ -20,10 +20,12 @@ import java.util.List;
 public class SharedResourcesRepository implements SharedResourcesRepositoryInterface {
     private final static Logger logger = LoggerFactory.getLogger(SharedResourcesRepository.class);
     private final List<ClassLoader> urlClassLoaders = new ArrayList<>();
+    private final String projectName;
 
     public SharedResourcesRepository(String projectName) throws OperationIncompleteException {
+        this.projectName = projectName;
         try {
-            load(projectName);
+            load();
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
@@ -38,7 +40,8 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
         return lastUrlClassLoader;
     }
 
-    private void load(String projectName) {
+    @Override
+    public void load() {
         try {
             initPreloadedResources();
 
@@ -61,6 +64,12 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void reload() {
+        urlClassLoaders.clear();
+        load();
     }
 
     private void loadResource(File file) throws OperationIncompleteException {
