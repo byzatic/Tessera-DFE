@@ -72,7 +72,7 @@ public class ProjectRepositoryImpl implements ProjectRepository {
     public @NotNull Boolean isNodeStorageDeclaration(@NotNull GraphNodeRef graphNodeRef, @NotNull String storageName) {
         boolean isExists = false;
         for (StoragesItem storageItem : nodeContainer.getNodeGlobal(graphNodeRef).getStorages()) {
-            if (storageItem.getDescription().equals(storageName)) {
+            if (storageItem.getIdName().equals(storageName)) {
                 isExists = true;
                 break;
             }
@@ -94,7 +94,7 @@ public class ProjectRepositoryImpl implements ProjectRepository {
     public @NotNull Boolean isGlobalStorageDeclaration(@NotNull String storageName) {
         boolean isExists = false;
         for (io.github.byzatic.tessera.engine.domain.model.project.StoragesItem storageItem : globalContainer.getProjectGlobal().getStorages()) {
-            if (storageItem.getDescription().equals(storageName)) {
+            if (storageItem.getIdName().equals(storageName)) {
                 isExists = true;
                 break;
             }
