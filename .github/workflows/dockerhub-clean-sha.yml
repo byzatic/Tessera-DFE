@@ -9,8 +9,8 @@ jobs:
   prune-sha:
     runs-on: ubuntu-latest
     env:
-      DOCKERHUB_NAMESPACE: your-namespace
-      DOCKERHUB_REPO: your-repo
+      DOCKERHUB_NAMESPACE: byzatic
+      DOCKERHUB_REPO: tessera-data-flow-engine
       DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
       DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
