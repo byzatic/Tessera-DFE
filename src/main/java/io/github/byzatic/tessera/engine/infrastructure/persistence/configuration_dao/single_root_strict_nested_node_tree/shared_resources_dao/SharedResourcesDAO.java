@@ -20,6 +20,7 @@ public class SharedResourcesDAO implements SharedResourcesDAOInterface {
     @Override
     public List<ClassLoader> loadSharedResources(String projectName) {
         List<ClassLoader> urlClassLoaders = new ArrayList<>();
+        load(projectName, urlClassLoaders);
         return urlClassLoaders;
     }
 
