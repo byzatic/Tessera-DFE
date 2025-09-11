@@ -1,4 +1,4 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.common;
+package io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common;
 
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;

@@ -3,30 +3,30 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 
 import java.util.*;
 
 class GraphPathFinderIterative {
 
-    private final JpaLikeNodeRepositoryInterface nodeRepository;
+    private final FullProjectRepository fullProjectRepository;
 
-    public GraphPathFinderIterative(JpaLikeNodeRepositoryInterface nodeRepository) {
-        this.nodeRepository = nodeRepository;
+    public GraphPathFinderIterative(FullProjectRepository fullProjectRepository) {
+        this.fullProjectRepository = fullProjectRepository;
     }
 
     public List<List<NodeItem>> findAllPathsTo(GraphNodeRef targetGraphNodeRef) throws OperationIncompleteException {
         try {
 
-            String targetUUID = this.nodeRepository.getNode(targetGraphNodeRef).getUUID();
+            String targetUUID = this.fullProjectRepository.getNode(targetGraphNodeRef).getUUID();
 
             List<List<NodeItem>> resultPaths = new ArrayList<>();
 
-            List<GraphNodeRef> allNodes = nodeRepository.getAllGraphNodeRef();
+            List<GraphNodeRef> allNodes = fullProjectRepository.listGraphNodeRef();
             Set<String> nonSources = new HashSet<>();
 
             for (GraphNodeRef graphNodeRef : allNodes) {
-                for (GraphNodeRef ref : nodeRepository.getNode(graphNodeRef).getDownstream()) {
+                for (GraphNodeRef ref : fullProjectRepository.getNode(graphNodeRef).getDownstream()) {
                     nonSources.add(ref.getNodeUUID());
                 }
             }
@@ -38,7 +38,7 @@ class GraphPathFinderIterative {
             Deque<PathState> stack = new ArrayDeque<>();
 
             for (GraphNodeRef source : sources) {
-                stack.push(new PathState(nodeRepository.getNode(source), new ArrayList<>()));
+                stack.push(new PathState(fullProjectRepository.getNode(source), new ArrayList<>()));
             }
 
             while (!stack.isEmpty()) {
@@ -53,7 +53,7 @@ class GraphPathFinderIterative {
                 }
 
                 for (GraphNodeRef ref : currentNode.getDownstream()) {
-                    NodeItem next = nodeRepository.getNode(ref);
+                    NodeItem next = fullProjectRepository.getNode(ref);
                     if (next != null) {
                         stack.push(new PathState(next, currentPath));
                     }

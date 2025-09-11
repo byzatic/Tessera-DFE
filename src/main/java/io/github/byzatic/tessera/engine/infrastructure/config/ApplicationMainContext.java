@@ -134,8 +134,7 @@ public class ApplicationMainContext {
     public static PipelineManagerFactoryInterface getPipelineManagerFactory() {
         if (pipelineManagerFactory == null) {
             pipelineManagerFactory = new PipelineManagerFactory(
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikePipelineRepositoryInterface.class),
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class),
+                    getProjectRepository(),
                     getModuleLoader(),
                     getStorageManager(),
                     getPathManager(),
@@ -148,9 +147,7 @@ public class ApplicationMainContext {
     public static ExecutionContextFactoryInterface getExecutionContextFactory() {
         if (executionContextFactory == null) {
             executionContextFactory = new ExecutionContextFactory(
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class),
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeProjectGlobalRepositoryInterface.class),
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeGlobalRepositoryInterface.class),
+                    getProjectRepository(),
                     getGraphPathManager()
             );
         }
@@ -160,7 +157,7 @@ public class ApplicationMainContext {
     public static GraphPathManagerInterface getGraphPathManager() {
         if (graphPathManager == null) {
             graphPathManager = new GraphPathManager(
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class)
+                    getProjectRepository()
             );
         }
         return graphPathManager;
@@ -171,7 +168,7 @@ public class ApplicationMainContext {
             if (moduleLoader == null) {
                 moduleLoader = new ModuleLoader(
                         Configuration.PROJECT_WORKFLOW_ROUTINES_PATH,
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, SharedResourcesRepositoryInterface.class)
+                        getProjectRepository()
                 );
             }
             return moduleLoader;
@@ -184,22 +181,8 @@ public class ApplicationMainContext {
         try {
             if (pathManager == null) {
                 pathManager = new PathManager(
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class),
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, StructureControllerInterface.class)
-                );
-            }
-            return pathManager;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static PathManagerInterface getPathManager() {
-        try {
-            if (pathManager == null) {
-                pathManager = new PathManager(
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class),
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, StructureControllerInterface.class)
+                        getProjectRepository(),
+                        getStructureController()
                 );
             }
             return pathManager;

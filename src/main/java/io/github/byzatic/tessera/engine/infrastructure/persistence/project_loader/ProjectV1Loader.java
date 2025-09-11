@@ -3,11 +3,9 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.project_load
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.domain.model.node.Project;
 import io.github.byzatic.tessera.engine.domain.model.node_global.NodeGlobal;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.NodePipeline;
-import io.github.byzatic.tessera.engine.domain.model.project.ProjectGlobal;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.common.NodeToGNRContainer;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectLoaderInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.GlobalContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.NodeContainer;

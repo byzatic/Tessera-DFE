@@ -3,7 +3,7 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.configuratio
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.common.NodeToGNRContainer;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

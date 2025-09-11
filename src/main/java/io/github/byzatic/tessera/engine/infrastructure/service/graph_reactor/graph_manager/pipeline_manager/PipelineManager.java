@@ -4,8 +4,7 @@ import io.github.byzatic.commons.schedulers.immediate.*;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.*;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikePipelineRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.MCg3WorkflowRoutineApi;
@@ -49,16 +48,14 @@ public class PipelineManager implements PipelineManagerInterface {
     private final List<GraphNodeRef> pathToCurrentExecutionNodeRef;
     private final StorageManagerInterface storageManager;
     private final ModuleLoaderInterface moduleLoader;
-    private final JpaLikePipelineRepositoryInterface pipelineRepository;
-    private final JpaLikeNodeRepositoryInterface nodeRepository;
     private final SupportPathResolver pathResolver;
     private final ExecutionContextFactoryInterface executionContextFactory;
+    private final FullProjectRepository fullProjectRepository;
 
     // ===== Constructor with external scheduler (preferred) =====
     public PipelineManager(GraphNodeRef graphNodeRef,
                            List<GraphNodeRef> pathToCurrentExecutionNodeRef,
-                           JpaLikePipelineRepositoryInterface pipelineRepository,
-                           JpaLikeNodeRepositoryInterface nodeRepository,
+                           FullProjectRepository fullProjectRepository,
                            ModuleLoaderInterface moduleLoader,
                            StorageManagerInterface storageManager,
                            PathManagerInterface pathManagerInterface,
@@ -67,8 +64,7 @@ public class PipelineManager implements PipelineManagerInterface {
                            JobEventListener... listeners) throws OperationIncompleteException {
         this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
         this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
-        this.pipelineRepository = Objects.requireNonNull(pipelineRepository, "pipelineRepository");
-        this.nodeRepository = Objects.requireNonNull(nodeRepository, "nodeRepository");
+        this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
@@ -96,16 +92,14 @@ public class PipelineManager implements PipelineManagerInterface {
     // ===== Constructor with self-hosted scheduler =====
     public PipelineManager(GraphNodeRef graphNodeRef,
                            List<GraphNodeRef> pathToCurrentExecutionNodeRef,
-                           JpaLikePipelineRepositoryInterface pipelineRepository,
-                           JpaLikeNodeRepositoryInterface nodeRepository,
+                           FullProjectRepository fullProjectRepository,
                            ModuleLoaderInterface moduleLoader,
                            StorageManagerInterface storageManager,
                            PathManagerInterface pathManagerInterface,
                            ExecutionContextFactoryInterface executionContextFactory) throws OperationIncompleteException {
         this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
         this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
-        this.pipelineRepository = Objects.requireNonNull(pipelineRepository, "pipelineRepository");
-        this.nodeRepository = Objects.requireNonNull(nodeRepository, "nodeRepository");
+        this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
@@ -125,10 +119,10 @@ public class PipelineManager implements PipelineManagerInterface {
 
     @Override
     public void runPipeline() throws OperationIncompleteException {
-        logger.debug("Run Pipeline for node {}", nodeRepository.getNode(graphNodeRef).getName());
+        logger.debug("Run Pipeline for node {}", fullProjectRepository.getNode(graphNodeRef).getName());
 
         // 1) Sorted stages
-        NodePipeline pipeline = pipelineRepository.getPipeline(graphNodeRef);
+        NodePipeline pipeline = fullProjectRepository.getPipeline(graphNodeRef);
         List<StagesConsistencyItem> stagesConsistencyItemList = new ArrayList<>(pipeline.getStagesConsistency());
         stagesConsistencyItemList.sort(Comparator.comparingInt(StagesConsistencyItem::getPosition));
         logger.debug("Sort stagesConsistencyItemList by Position complete");
@@ -228,7 +222,7 @@ public class PipelineManager implements PipelineManagerInterface {
                     WorkflowRoutineInterface workflowRoutine = moduleLoader.getModule(
                             workerName,
                             MCg3WorkflowRoutineApi.newBuilder()
-                                    .setStorageApi(new StorageApi(storageManager, graphNodeRef, nodeRepository))
+                                    .setStorageApi(new StorageApi(storageManager, graphNodeRef, fullProjectRepository))
                                     .setConfigurationParameters(configurationParameterList)
                                     .setExecutionContext(
                                             this.executionContextFactory.getExecutionContext(

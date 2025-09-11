@@ -9,6 +9,7 @@ import io.github.byzatic.tessera.engine.domain.model.node_global.StoragesItem;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.NodePipeline;
 import io.github.byzatic.tessera.engine.domain.model.project.ProjectGlobal;
 import io.github.byzatic.tessera.engine.domain.repository.ProjectRepository;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.ProjectConfigReader;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.GlobalContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.NodeContainer;
@@ -149,5 +150,10 @@ public class ProjectRepositoryImpl implements ProjectRepository {
     @Override
     public void reload() throws OperationIncompleteException {
         load();
+    }
+
+    @Override
+    public @NotNull NodeToGNRContainer getNodeToGNRContainer() throws OperationIncompleteException {
+        return new NodeToGNRContainer(nodeContainer.getNodeMap());
     }
 }

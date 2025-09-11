@@ -1,5 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context;
 
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
@@ -23,16 +24,12 @@ import java.util.stream.Collectors;
 
 public class ExecutionContextFactory implements ExecutionContextFactoryInterface {
 
-    private final JpaLikeNodeRepositoryInterface nodeRepository;
-    private final JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository;
+    private final FullProjectRepository fullProjectRepository;
     private final Map<GraphNodeRef, ExecutionContextInterface> executionContextInterfaceMap = new HashMap<>();
-    private final JpaLikeNodeGlobalRepositoryInterface nodeGlobalRepository;
     private final GraphPathManagerInterface graphPathManager;
 
-    public ExecutionContextFactory(JpaLikeNodeRepositoryInterface nodeRepository, JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository, JpaLikeNodeGlobalRepositoryInterface nodeGlobalRepository, GraphPathManagerInterface graphPathManager) {
-        this.nodeRepository = nodeRepository;
-        this.projectGlobalRepository = projectGlobalRepository;
-        this.nodeGlobalRepository = nodeGlobalRepository;
+    public ExecutionContextFactory(FullProjectRepository fullProjectRepository, GraphPathManagerInterface graphPathManager) {
+        this.fullProjectRepository = fullProjectRepository;
         this.graphPathManager = graphPathManager;
     }
 
@@ -63,7 +60,7 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
         try {
             List<NodeItem> nodeItemList = new ArrayList<>();
             for (GraphNodeRef graphNodeRef : pathToCurrentExecutionNodeRef) {
-                nodeItemList.add(this.nodeRepository.getNode(graphNodeRef));
+                nodeItemList.add(this.fullProjectRepository.getNode(graphNodeRef));
             }
             return nodeItemList;
         } catch (OperationIncompleteException e) {
@@ -75,10 +72,10 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
         try {
             ExecutionContextInterface result;
 
-            NodeItem nodeItem = this.nodeRepository.getNode(graphNodeRef);
+            NodeItem nodeItem = this.fullProjectRepository.getNode(graphNodeRef);
 
             List<StorageDescriptionInterface> nodeStorageDescriptionList = new ArrayList<>();
-            for (io.github.byzatic.tessera.engine.domain.model.node_global.StoragesItem storageItem : this.nodeGlobalRepository.getNodeGlobal(graphNodeRef).getStorages()) {
+            for (io.github.byzatic.tessera.engine.domain.model.node_global.StoragesItem storageItem : this.fullProjectRepository.getNodeGlobal(graphNodeRef).getStorages()) {
                 nodeStorageDescriptionList.add(StorageDescription.newBuilder(storageItem).build());
             }
 
@@ -90,7 +87,7 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
                     .build();
 
             List<StorageDescriptionInterface> globalStorageDescriptionList = new ArrayList<>();
-            for (StoragesItem storageItem : this.projectGlobalRepository.getProjectGlobal().getStorages()) {
+            for (StoragesItem storageItem : this.fullProjectRepository.getGlobal().getStorages()) {
                 globalStorageDescriptionList.add(StorageDescription.newBuilder(storageItem).build());
             }
 
