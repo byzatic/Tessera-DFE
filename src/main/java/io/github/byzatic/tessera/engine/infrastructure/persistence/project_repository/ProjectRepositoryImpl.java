@@ -26,8 +26,6 @@ import java.util.Map;
 public class ProjectRepositoryImpl implements ProjectRepository {
     private final static Logger logger = LoggerFactory.getLogger(ProjectRepositoryImpl.class);
     private final String projectName;
-
-    public enum ProjectLoaderTypes{PLV1}
     private final Map<ProjectLoaderTypes, ProjectLoaderInterface> projectLoaderTypedMap = new HashMap<>();
 
     private SharedResourcesContainer sharedResourcesContainer = null;

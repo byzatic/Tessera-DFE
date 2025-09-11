@@ -1,16 +1,15 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository;
 
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.jpa_like_node_repository.JpaLikeNodeRepository;
+import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.NodeLifecycleState;
-import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,14 +22,14 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
 
     List<GraphNodeRef> listRoot = new ArrayList<>();
 
-    public GraphManagerNodeRepository(@NotNull JpaLikeNodeRepositoryInterface nodeRepository) throws OperationIncompleteException {
+    public GraphManagerNodeRepository(@NotNull FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
         try {
             logger.debug("Initialise GraphManagerNodeRepository");
-            ObjectsUtils.requireNonNull(nodeRepository, new IllegalArgumentException(JpaLikeNodeRepository.class.getSimpleName() + " should be NotNull"));
-            List<GraphNodeRef> graphNodeRefs = nodeRepository.getAllGraphNodeRef();
+            ObjectsUtils.requireNonNull(fullProjectRepository, new IllegalArgumentException(FullProjectRepository.class.getSimpleName() + " should be NotNull"));
+            List<GraphNodeRef> graphNodeRefs = fullProjectRepository.listGraphNodeRef();
             logger.debug("List of all GraphNodeRef size is {}", graphNodeRefs.size());
             for (GraphNodeRef graphNodeRef : graphNodeRefs) {
-                NodeItem nodeItem = nodeRepository.getNode(graphNodeRef);
+                NodeItem nodeItem = fullProjectRepository.getNode(graphNodeRef);
                 Node newNode = Node.newBuilder()
                         .setGraphNodeRef(graphNodeRef)
                         .setDownstream(nodeItem.getDownstream())
@@ -110,13 +109,13 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
         for (Map.Entry<GraphNodeRef, Node> nodeRefNodeSet : nodeRefNodeMap.entrySet()) {
             List<GraphNodeRef> downstream = nodeRefNodeSet.getValue().getDownstream();
             for (GraphNodeRef downstreamItem : downstream) {
-                if (! listAllDownstream.contains(downstreamItem)) listAllDownstream.add(downstreamItem);
+                if (!listAllDownstream.contains(downstreamItem)) listAllDownstream.add(downstreamItem);
             }
         }
         List<GraphNodeRef> listAllRoot = new ArrayList<>();
         for (Map.Entry<GraphNodeRef, Node> nodeRefNodeSet : nodeRefNodeMap.entrySet()) {
             GraphNodeRef nodeRef = nodeRefNodeSet.getKey();
-            if (! listAllDownstream.contains(nodeRef)) listAllRoot.add(nodeRef);
+            if (!listAllDownstream.contains(nodeRef)) listAllRoot.add(nodeRef);
         }
         logger.debug("Searching for Roots complete; listAllRoot size is {}", listAllRoot.size());
         listRoot = listAllRoot;

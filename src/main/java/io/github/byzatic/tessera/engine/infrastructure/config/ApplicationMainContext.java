@@ -3,14 +3,19 @@ package io.github.byzatic.tessera.engine.infrastructure.config;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationService;
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceInterface;
+import io.github.byzatic.tessera.engine.domain.repository.ProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.node_global_dao.NodeGlobalDao;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.node_pipeline_dao.PipelineDao;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project.ProjectDao;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_global.ProjectGlobalDao;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_controller.StructureController;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_controller.StructureControllerInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.*;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.resource_manager.ResourceFactoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.resource_manager.ResourceManager;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.resource_manager.common_v1_hierarchical.ResourceFactoryV1Hierarchical;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.shared_resources_dao.SharedResourcesDAO;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_loader.*;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectRepositoryImpl;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageManager;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.GraphManagerFactory;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_management.GraphPathManager;
@@ -41,8 +46,13 @@ public class ApplicationMainContext {
     private static GraphPathManagerInterface graphPathManager = null;
     private static ServicesManagerFactoryInterface servicesManagerFactory = null;
     private static GraphManagerFactoryInterface graphManagerFactory = null;
-    private static ResourceFactoryInterface resourceFactory = null;
-    private static ResourceManagerInterface resourceManager = null;
+    private static ProjectRepository fullProjectRepository;
+    private static StructureControllerInterface structureController;
+    private static ProjectDaoInterface projectDao;
+    private static NodeGlobalDaoInterface nodeGlobalDao;
+    private static PipelineDaoInterface pipelineDao;
+    private static ProjectGlobalDaoInterface projectGlobalDao;
+    private static SharedResourcesDAOInterface sharedResourcesDAO;
 
     static {
         Configuration.MDC_ENGINE_CONTEXT.apply();
@@ -62,10 +72,9 @@ public class ApplicationMainContext {
     public static ServicesManagerFactoryInterface getServicesManagerFactory() {
         if (servicesManagerFactory == null) {
             servicesManagerFactory = new ServicesManagerFactory(
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeProjectGlobalRepositoryInterface.class),
+                    getProjectRepository(),
                     getServiceLoader(),
-                    getStorageManager(),
-                    getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class)
+                    getStorageManager()
             );
         }
         return servicesManagerFactory;
@@ -76,7 +85,7 @@ public class ApplicationMainContext {
             if (serviceLoader == null) {
                 serviceLoader = new ServiceLoader(
                         Configuration.PROJECT_SERVICES_PATH,
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, SharedResourcesRepositoryInterface.class)
+                        getProjectRepository()
                 );
             }
             return serviceLoader;
@@ -89,9 +98,7 @@ public class ApplicationMainContext {
         try {
             if (storageManager == null) {
                 storageManager = new StorageManager(
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeGlobalRepositoryInterface.class),
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeProjectGlobalRepositoryInterface.class),
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class)
+                        getProjectRepository()
                 );
             }
             return storageManager;
@@ -115,7 +122,7 @@ public class ApplicationMainContext {
         try {
             if (graphManagerNodeRepository == null) {
                 graphManagerNodeRepository = new GraphManagerNodeRepository(
-                        getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class)
+                        getProjectRepository()
                 );
             }
             return graphManagerNodeRepository;
@@ -187,26 +194,95 @@ public class ApplicationMainContext {
         }
     }
 
-    public static ResourceManagerInterface getResourceManager() {
+    public static PathManagerInterface getPathManager() {
         try {
-            if (resourceManager == null) {
-                resourceManager = new ResourceManager(
-                        getResourceFactory()
+            if (pathManager == null) {
+                pathManager = new PathManager(
+                        getResourceManager().getResource(Configuration.PROJECT_NAME, JpaLikeNodeRepositoryInterface.class),
+                        getResourceManager().getResource(Configuration.PROJECT_NAME, StructureControllerInterface.class)
                 );
-                resourceManager.loadAll(Configuration.PROJECT_NAME);
             }
-            return resourceManager;
+            return pathManager;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static ResourceFactoryInterface getResourceFactory() {
+    public static ProjectRepository getProjectRepository() {
         try {
-            if (resourceFactory == null) {
-                resourceFactory = new ResourceFactoryV1Hierarchical();
+            if (fullProjectRepository == null) {
+                fullProjectRepository = new ProjectRepositoryImpl(
+                        Configuration.PROJECT_NAME
+                );
+                fullProjectRepository.addProjectLoader(ProjectRepository.ProjectLoaderTypes.PLV1, new ProjectV1Loader(
+                                getNodeGlobalDao(),
+                                getPipelineDao(),
+                                getProjectDao(),
+                                getProjectGlobalDao(),
+                                getSharedResourcesDAO()
+                        )
+                );
+                fullProjectRepository.load();
             }
-            return resourceFactory;
+            return fullProjectRepository;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static ProjectDaoInterface getProjectDao() {
+        if (projectDao == null) {
+            projectDao = new ProjectDao(getStructureController());
+        }
+        return projectDao;
+    }
+
+    public static ProjectGlobalDaoInterface getProjectGlobalDao() {
+        try {
+            if (projectGlobalDao == null) {
+                projectGlobalDao = new ProjectGlobalDao();
+            }
+            return projectGlobalDao;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static NodeGlobalDaoInterface getNodeGlobalDao() {
+        if (nodeGlobalDao == null) {
+            nodeGlobalDao = new NodeGlobalDao(getStructureController());
+        }
+        return nodeGlobalDao;
+    }
+
+    public static PipelineDaoInterface getPipelineDao() {
+        try {
+            if (pipelineDao == null) {
+                pipelineDao = new PipelineDao(getStructureController());
+            }
+            return pipelineDao;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static SharedResourcesDAOInterface getSharedResourcesDAO() {
+        try {
+            if (sharedResourcesDAO == null) {
+                sharedResourcesDAO = new SharedResourcesDAO();
+            }
+            return sharedResourcesDAO;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static StructureControllerInterface getStructureController() {
+        try {
+            if (structureController == null) {
+                structureController = new StructureController(Configuration.PROJECT_NAME);
+            }
+            return structureController;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

@@ -1,14 +1,11 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import io.github.byzatic.commons.schedulers.immediate.*;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.commons.logging.MdcServiceContext;
 import io.github.byzatic.tessera.engine.domain.model.project.ServiceItem;
 import io.github.byzatic.tessera.engine.domain.model.project.ServicesOptionsItem;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeProjectGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.dto.ServiceDescriptor;
@@ -17,20 +14,13 @@ import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.s
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface.MCg3ServiceApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface.StorageApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_loader.ServiceLoaderInterface;
-
 import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
 import io.github.byzatic.tessera.service.configuration.ServiceConfigurationParameter;
 import io.github.byzatic.tessera.service.execution_context.ExecutionContextInterface;
 import io.github.byzatic.tessera.service.service.ServiceInterface;
 import io.github.byzatic.tessera.service.service.health.HealthFlagProxy;
-
-import io.github.byzatic.commons.schedulers.immediate.CancellationToken;
-import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;            // <-- для Builder()
-import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
-import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
-import io.github.byzatic.commons.schedulers.immediate.JobInfo;
-import io.github.byzatic.commons.schedulers.immediate.JobState;
-import io.github.byzatic.commons.schedulers.immediate.Task;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
@@ -40,14 +30,14 @@ import java.util.stream.Collectors;
 
 /**
  * ServicesManager rewritten to use ImmediateScheduler.
- *
+ * <p>
  * Semantics:
  * - Loads service descriptors from ProjectGlobal on construction.
  * - runAllServices(): starts any missing services immediately via ImmediateScheduler.
  * - stopAllServices(): requests soft stop (ServiceInterface#terminate) and waits up to a grace timeout
- *   (per-service getTerminationIntervalMinutes() or default 3 minutes), then removes tasks.
+ * (per-service getTerminationIntervalMinutes() or default 3 minutes), then removes tasks.
  * - Supports external JobEventListener (e.g., business logic) provided via constructor; it is wired
- *   directly into the ImmediateScheduler.
+ * directly into the ImmediateScheduler.
  */
 public class ServicesManager implements ServicesManagerInterface {
 
@@ -55,60 +45,68 @@ public class ServicesManager implements ServicesManagerInterface {
 
     private final ServiceLoaderInterface serviceLoader;
     private final StorageManagerInterface storageManager;
-    private final JpaLikeNodeRepositoryInterface nodeRepository;
     private final ImmediateSchedulerInterface scheduler;
 
-    /** serviceDescriptorMap keeps original descriptors (keyed by hash). */
+    /**
+     * serviceDescriptorMap keeps original descriptors (keyed by hash).
+     */
     private final Map<Integer, ServiceDescriptor> serviceDescriptorMap = new ConcurrentHashMap<>();
 
-    /** Map serviceName -> jobId for quick existence checks. */
+    /**
+     * Map serviceName -> jobId for quick existence checks.
+     */
     private final Map<String, UUID> serviceNameToJobId = new ConcurrentHashMap<>();
 
-    /** Map jobId -> service instance so we can terminate with a per-service grace timeout. */
+    /**
+     * Map jobId -> service instance so we can terminate with a per-service grace timeout.
+     */
     private final Map<UUID, ServiceInterface> runningServices = new ConcurrentHashMap<>();
 
-    /** Optional external listener (e.g., business logic) */
+    /**
+     * Optional external listener (e.g., business logic)
+     */
     private final AtomicReference<JobEventListener> externalListenerRef = new AtomicReference<>(null);
 
-    /** Владеем ли мы внутренним шедуллером (созданным в перегруженном конструкторе) */
+    /**
+     * Владеем ли мы внутренним шедуллером (созданным в перегруженном конструкторе)
+     */
     @SuppressWarnings("FieldCanBeLocal")
     private final boolean ownsScheduler;
+    private final FullProjectRepository fullProjectRepository;
 
     // ========= Конструктор №1: с внешним шедуллером =========
     public ServicesManager(
-            JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository,
+            FullProjectRepository fullProjectRepository,
             ServiceLoaderInterface serviceLoader,
             StorageManagerInterface storageManager,
-            JpaLikeNodeRepositoryInterface nodeRepository,
             ImmediateSchedulerInterface scheduler,
             JobEventListener... listeners // optional: pass from business logic
     ) {
         this.serviceLoader = Objects.requireNonNull(serviceLoader, "serviceLoader");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
-        this.nodeRepository = Objects.requireNonNull(nodeRepository, "nodeRepository");
+        this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.ownsScheduler = false;
 
-        loadDescriptors(projectGlobalRepository);
+        loadDescriptors(fullProjectRepository);
         wireListeners(listeners);
     }
 
     // ========= Конструктор №2: без шедуллера — создаём свой =========
     public ServicesManager(
-            JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository,
+            FullProjectRepository fullProjectRepository,
             ServiceLoaderInterface serviceLoader,
             StorageManagerInterface storageManager,
-            JpaLikeNodeRepositoryInterface nodeRepository,
             JobEventListener... listeners // optional
     ) {
         this.serviceLoader = Objects.requireNonNull(serviceLoader, "serviceLoader");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
-        this.nodeRepository = Objects.requireNonNull(nodeRepository, "nodeRepository");
+        this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         // Создаём дефолтный ImmediateScheduler через Builder (пул потоков и grace по умолчанию)
         this.scheduler = new ImmediateScheduler.Builder().build();
         this.ownsScheduler = true;
 
-        loadDescriptors(projectGlobalRepository);
+        loadDescriptors(fullProjectRepository);
         wireListeners(listeners);
     }
 
@@ -124,19 +122,28 @@ public class ServicesManager implements ServicesManagerInterface {
         }
         // Внутренний логирующий слушатель
         scheduler.addListener(new JobEventListener() {
-            @Override public void onStart(UUID jobId) {
+            @Override
+            public void onStart(UUID jobId) {
                 logger.debug("Service job {} started ({})", jobId, serviceNameOf(jobId));
             }
-            @Override public void onComplete(UUID jobId) {
+
+            @Override
+            public void onComplete(UUID jobId) {
                 logger.debug("Service job {} completed ({})", jobId, serviceNameOf(jobId));
             }
-            @Override public void onError(UUID jobId, Throwable error) {
+
+            @Override
+            public void onError(UUID jobId, Throwable error) {
                 logger.warn("Service job {} failed ({}): {}", jobId, serviceNameOf(jobId), error.toString());
             }
-            @Override public void onTimeout(UUID jobId) {
+
+            @Override
+            public void onTimeout(UUID jobId) {
                 logger.warn("Service job {} timed out ({})", jobId, serviceNameOf(jobId));
             }
-            @Override public void onCancelled(UUID jobId) {
+
+            @Override
+            public void onCancelled(UUID jobId) {
                 logger.info("Service job {} cancelled ({})", jobId, serviceNameOf(jobId));
             }
         });
@@ -149,9 +156,9 @@ public class ServicesManager implements ServicesManagerInterface {
         return "?";
     }
 
-    private void loadDescriptors(JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository) {
-        Objects.requireNonNull(projectGlobalRepository, "projectGlobalRepository");
-        for (ServiceItem serviceDescription : projectGlobalRepository.getProjectGlobal().getServices()) {
+    private void loadDescriptors(FullProjectRepository fullProjectRepository) {
+        Objects.requireNonNull(fullProjectRepository, "projectGlobalRepository");
+        for (ServiceItem serviceDescription : fullProjectRepository.getGlobal().getServices()) {
             String serviceId = serviceDescription.getIdName();
             List<ServiceParameter> serviceParameters = new ArrayList<>();
             for (ServicesOptionsItem opt : serviceDescription.getOptions()) {
@@ -294,7 +301,8 @@ public class ServicesManager implements ServicesManagerInterface {
         public void run(CancellationToken token) throws Exception {
             try {
                 Thread.currentThread().setName("service-" + safeName());
-            } catch (Throwable ignore) { }
+            } catch (Throwable ignore) {
+            }
             service.run();
         }
 
