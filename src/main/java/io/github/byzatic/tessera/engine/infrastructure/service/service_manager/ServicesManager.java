@@ -225,7 +225,7 @@ public class ServicesManager implements ServicesManagerInterface {
 
                 // API + загрузка сервиса
                 MCg3ServiceApiInterface serviceApi = MCg3ServiceApi.newBuilder()
-                        .storageApi(new StorageApi(storageManager, null, nodeRepository))
+                        .storageApi(new StorageApi(storageManager, null, fullProjectRepository))
                         .executionContext(executionContext)
                         .serviceConfigurationParameters(params)
                         .build();

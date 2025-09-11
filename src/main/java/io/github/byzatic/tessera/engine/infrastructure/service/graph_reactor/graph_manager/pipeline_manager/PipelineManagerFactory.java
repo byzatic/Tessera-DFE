@@ -2,21 +2,19 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
-import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
-import org.jetbrains.annotations.NotNull;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context.ExecutionContextFactoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoaderInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.JpaLikePipelineRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
 public class PipelineManagerFactory implements PipelineManagerFactoryInterface {
-    private FullProjectRepository fullProjectRepository= null;
+    private FullProjectRepository fullProjectRepository = null;
     private ExecutionContextFactoryInterface executionContextFactory = null;
     private ModuleLoaderInterface moduleLoader = null;
     private StorageManagerInterface storageManager = null;
@@ -27,7 +25,7 @@ public class PipelineManagerFactory implements PipelineManagerFactoryInterface {
         try {
             clazz.getConstructor();
         } catch (Exception e) {
-            throw new OperationIncompleteException("Creating test objects ("+clazz.getSimpleName()+") with non-default constructors is not supported.", e);
+            throw new OperationIncompleteException("Creating test objects (" + clazz.getSimpleName() + ") with non-default constructors is not supported.", e);
         }
         this.pipelineManagerClazz = clazz;
     }
