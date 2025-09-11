@@ -6,5 +6,5 @@ import io.github.byzatic.tessera.engine.domain.model.node.Project;
 import java.nio.file.Path;
 
 public interface ProjectDaoInterface {
-    Project load(Path projectFile) throws OperationIncompleteException;
+    Project load() throws OperationIncompleteException;
 }

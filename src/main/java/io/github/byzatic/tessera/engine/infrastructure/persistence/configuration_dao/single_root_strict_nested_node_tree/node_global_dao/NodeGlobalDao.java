@@ -26,7 +26,7 @@ public class NodeGlobalDao implements NodeGlobalDaoInterface {
         try {
             Map<GraphNodeRef, NodeGlobal> nodeGlobalMap = new HashMap<>();
             for (GraphNodeRef graphNodeRef : nodeToGNRContainer.getAllGraphNodeRef()) {
-                Path nodePath = structureManager.getNodeStructure(graphNodeRef).getNodeFolder().resolve("global.json");
+                Path nodePath = structureManager.getNodeStructure(graphNodeRef, nodeToGNRContainer).getNodeFolder().resolve("global.json");
                 NodeGlobal nodeGlobal = SupportNodeGlobalLoader.load(nodePath);
                 if (nodeGlobalMap.containsKey(graphNodeRef)) {
                     String errMessage = "Repository " + NodeToGNRContainer.class.getSimpleName() + " already contains object " + NodeGlobal.class.getSimpleName() + " by identifier " + graphNodeRef;

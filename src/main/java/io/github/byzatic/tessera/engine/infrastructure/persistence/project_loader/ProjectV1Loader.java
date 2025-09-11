@@ -7,6 +7,7 @@ import io.github.byzatic.tessera.engine.domain.model.node.Project;
 import io.github.byzatic.tessera.engine.domain.model.node_global.NodeGlobal;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.NodePipeline;
 import io.github.byzatic.tessera.engine.domain.model.project.ProjectGlobal;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.common.NodeToGNRContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectLoaderInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.GlobalContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.NodeContainer;
@@ -45,18 +46,23 @@ public class ProjectV1Loader implements ProjectLoaderInterface {
 
     @Override
     public @NotNull NodeContainer getNodeContainer(@NotNull String projectName) {
+        try {
+            NodeContainer nodeContainer = null;
 
-        Map<GraphNodeRef, NodeItem> graphNodeRefNodeItemMap = projectDao.load(projectName).getNodeMap();
-        Map<GraphNodeRef, NodeGlobal> graphNodeRefNodeGlobalMap = nodeGlobalDao.load(projectName);
-        Map<GraphNodeRef, NodePipeline> graphNodeRefNodePipelineMap = pipelineDao.load(projectName);
+            Map<GraphNodeRef, NodeItem>  graphNodeRefNodeItemMap = projectDao.load().getNodeMap();
+            NodeToGNRContainer nodeToGNRContainer = new NodeToGNRContainer(graphNodeRefNodeItemMap);
+            Map<GraphNodeRef, NodeGlobal> graphNodeRefNodeGlobalMap = nodeGlobalDao.load(projectName, nodeToGNRContainer);
+            Map<GraphNodeRef, NodePipeline> graphNodeRefNodePipelineMap = pipelineDao.load(projectName, nodeToGNRContainer);
 
-        NodeContainer nodeContainer = new NodeContainer(
-                graphNodeRefNodeItemMap,
-                graphNodeRefNodeGlobalMap,
-                graphNodeRefNodePipelineMap
-        );
-
-        return nodeContainer;
+            nodeContainer = new NodeContainer(
+                    graphNodeRefNodeItemMap,
+                    graphNodeRefNodeGlobalMap,
+                    graphNodeRefNodePipelineMap
+            );
+            return nodeContainer;
+        } catch (OperationIncompleteException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

@@ -32,7 +32,7 @@ public class PipelineDao implements PipelineDaoInterface {
                     logger.error(errMessage);
                     throw new OperationIncompleteException(errMessage);
                 }
-                Path nodePath = structureManager.getNodeStructure(graphNodeRef).getNodeFolder().resolve("pipeline.json");
+                Path nodePath = structureManager.getNodeStructure(graphNodeRef, nodeToGNRContainer).getNodeFolder().resolve("pipeline.json");
                 NodePipeline nodePipeline = SupportNodePipelineLoader.load(nodePath);
                 if (nodePipelineMap.containsKey(graphNodeRef)) {
                     String errMessage = "Repository " + NodeToGNRContainer.class.getSimpleName() + " already contains object " + NodePipeline.class.getSimpleName() + " by identifier " + graphNodeRef;
