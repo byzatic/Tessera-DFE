@@ -113,7 +113,7 @@ public class ProjectRepositoryImpl implements ProjectRepository {
             Map<String, ProjectLoaderTypes> projectLoaderTypesByProjectVersionMap = new HashMap<>();
             projectLoaderTypesByProjectVersionMap.put("v1.0.0-SingleRootStrictNestedNodeTree", ProjectLoaderTypes.PLV1);
 
-            String projectVersion = ProjectConfigReader.readProjectConfigVersion(Configuration.PROJECTS_DIR.resolve(projectName).resolve("Project.json"));
+            String projectVersion = ProjectConfigReader.readProjectConfigVersion(Configuration.PROJECTS_DIR.resolve(projectName).resolve("data").resolve("Project.json"));
 
             ProjectLoaderInterface projectLoader = null;
             if (projectLoaderTypesByProjectVersionMap.containsKey(projectVersion)) {
