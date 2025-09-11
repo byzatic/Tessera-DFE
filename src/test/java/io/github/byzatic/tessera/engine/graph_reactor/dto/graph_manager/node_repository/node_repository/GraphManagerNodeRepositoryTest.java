@@ -1,14 +1,14 @@
 package io.github.byzatic.tessera.engine.graph_reactor.dto.graph_manager.node_repository.node_repository;
 
 
-import org.junit.Before;
-import org.junit.Test;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.trash.jpa_like_node_repository.JpaLikeNodeRepository;
+import io.github.byzatic.tessera.engine.domain.repository.ProjectRepository;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository.GraphManagerNodeRepository;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.util.*;
 
@@ -49,8 +49,8 @@ public class GraphManagerNodeRepositoryTest {
 
     @Test
     public void testConstructorFromNodeRepository() throws Exception {
-        JpaLikeNodeRepository nodeRepository = mock(JpaLikeNodeRepository.class);
-        when(nodeRepository.getAllGraphNodeRef()).thenReturn(Arrays.asList(nodeRef1, nodeRef2));
+        ProjectRepository projectRepository = mock(ProjectRepository.class);
+        when(projectRepository.listGraphNodeRef()).thenReturn(Arrays.asList(nodeRef1, nodeRef2));
 
         NodeItem nic1 = mock(NodeItem.class);
         when(nic1.getDownstream()).thenReturn(Collections.singletonList(nodeRef2));
@@ -58,10 +58,10 @@ public class GraphManagerNodeRepositoryTest {
         NodeItem nic2 = mock(NodeItem.class);
         when(nic2.getDownstream()).thenReturn(Collections.emptyList());
 
-        when(nodeRepository.getNode(nodeRef1)).thenReturn(nic1);
-        when(nodeRepository.getNode(nodeRef2)).thenReturn(nic2);
+        when(projectRepository.getNode(nodeRef1)).thenReturn(nic1);
+        when(projectRepository.getNode(nodeRef2)).thenReturn(nic2);
 
-        GraphManagerNodeRepository repo = new GraphManagerNodeRepository(nodeRepository);
+        GraphManagerNodeRepository repo = new GraphManagerNodeRepository(projectRepository);
 
         assertEquals(2, repo.listGraphNodeRef().size());
         assertEquals(Collections.singletonList(nodeRef2), repo.getNode(nodeRef1).getDownstream());
