@@ -13,5 +13,6 @@ public interface GlobalRepository {
 
     // GLOBAL
     @NotNull ProjectGlobal getGlobal();
+
     @NotNull Boolean isGlobalStorageDeclaration(@NotNull String storageId);
 }

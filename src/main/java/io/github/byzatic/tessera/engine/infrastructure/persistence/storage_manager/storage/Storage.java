@@ -1,16 +1,19 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.storage;
 
+import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
+import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageInterface;
+import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
 import org.apache.commons.math3.util.Pair;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
-import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
-import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageInterface;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Storage<T extends DataValueInterface> implements StorageInterface<T> {
@@ -39,9 +42,11 @@ public class Storage<T extends DataValueInterface> implements StorageInterface<T
 
     @Contract("null -> fail")
     private @NotNull String getId(DataLookupIdentifierImpl id) throws OperationIncompleteException {
-        if (id == null) throw new OperationIncompleteException(DataLookupIdentifierImpl.class.getSimpleName() + " should be not null");
+        if (id == null)
+            throw new OperationIncompleteException(DataLookupIdentifierImpl.class.getSimpleName() + " should be not null");
         String temp = id.getDataLookupIdentifier();
-        if (temp == null) throw new OperationIncompleteException(DataLookupIdentifierImpl.class.getSimpleName() + ".id should be not null");
+        if (temp == null)
+            throw new OperationIncompleteException(DataLookupIdentifierImpl.class.getSimpleName() + ".id should be not null");
         return temp;
     }
 
@@ -76,13 +81,13 @@ public class Storage<T extends DataValueInterface> implements StorageInterface<T
     }
 
     @Override
-    public  @NotNull Boolean delete(@NotNull DataLookupIdentifierImpl storageItemIdI) throws OperationIncompleteException {
+    public @NotNull Boolean delete(@NotNull DataLookupIdentifierImpl storageItemIdI) throws OperationIncompleteException {
         String id = getId(storageItemIdI);
         return storage.remove(id) != null;
     }
 
     @Override
-    public  @NotNull List<Pair<String, T>> list() throws OperationIncompleteException {
+    public @NotNull List<Pair<String, T>> list() throws OperationIncompleteException {
         List<Pair<String, T>> storedPairs = new ArrayList<>();
         for (Map.Entry<String, T> set : storage.entrySet()) {
             storedPairs.add(new Pair<>(set.getKey(), set.getValue()));

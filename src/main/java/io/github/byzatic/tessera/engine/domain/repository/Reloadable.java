@@ -4,5 +4,6 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 
 public interface Reloadable {
     void load() throws OperationIncompleteException;
+
     void reload() throws OperationIncompleteException;
 }

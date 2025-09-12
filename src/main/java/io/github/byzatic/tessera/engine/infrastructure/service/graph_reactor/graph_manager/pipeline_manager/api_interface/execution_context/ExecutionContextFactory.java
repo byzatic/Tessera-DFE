@@ -40,7 +40,7 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
             if (executionContextInterfaceMap.containsKey(graphNodeRef)) {
                 result = executionContextInterfaceMap.get(graphNodeRef);
             } else {
-                result = create(graphNodeRef, pathToCurrentExecutionNodeRef, stagesDescriptionItem,  workersDescriptionItem, stagesConsistencyItem);
+                result = create(graphNodeRef, pathToCurrentExecutionNodeRef, stagesDescriptionItem, workersDescriptionItem, stagesConsistencyItem);
             }
             return result;
         } catch (Exception e) {
@@ -137,7 +137,6 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
     public synchronized void reload() {
         executionContextInterfaceMap.clear();
     }
-
 
 
 }

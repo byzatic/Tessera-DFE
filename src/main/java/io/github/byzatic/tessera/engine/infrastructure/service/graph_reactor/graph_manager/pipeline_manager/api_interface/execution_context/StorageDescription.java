@@ -1,8 +1,8 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context;
 
+import io.github.byzatic.tessera.engine.domain.model.node_global.OptionsItem;
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesItem;
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesOptionsItem;
-import io.github.byzatic.tessera.engine.domain.model.node_global.OptionsItem;
 import io.github.byzatic.tessera.workflowroutine.execution_context.StorageDescriptionInterface;
 import io.github.byzatic.tessera.workflowroutine.execution_context.StorageOptionInterface;
 
@@ -54,7 +54,7 @@ public class StorageDescription implements StorageDescriptionInterface {
 
     private static List<StorageOptionInterface> convertGlobalStoragesItemOptions(StoragesItem storagesItem) {
         List<StorageOptionInterface> options = new ArrayList<>();
-        for (StoragesOptionsItem option: storagesItem.getOptions()) {
+        for (StoragesOptionsItem option : storagesItem.getOptions()) {
             options.add(StorageOption.newBuilder()
                     .setKey(String.copyValueOf(option.getKey().toCharArray()))
                     .setValue(String.copyValueOf(option.getValue().toCharArray()))
@@ -66,7 +66,7 @@ public class StorageDescription implements StorageDescriptionInterface {
 
     private static List<StorageOptionInterface> convertNodeStoragesItemOptions(io.github.byzatic.tessera.engine.domain.model.node_global.StoragesItem storagesItem) {
         List<StorageOptionInterface> options = new ArrayList<>();
-        for (OptionsItem option: storagesItem.getOptions()) {
+        for (OptionsItem option : storagesItem.getOptions()) {
             options.add(StorageOption.newBuilder()
                     .setKey(String.copyValueOf(option.getKey().toCharArray()))
                     .setValue(String.copyValueOf(option.getValue().toCharArray()))

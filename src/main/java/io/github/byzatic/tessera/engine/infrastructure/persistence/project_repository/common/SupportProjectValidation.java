@@ -9,7 +9,7 @@ class SupportProjectValidation {
     private final static Logger logger = LoggerFactory.getLogger(SupportProjectValidation.class);
     private final String versionId = "v1.0.0";
     private final String versionType = "SingleRootStrictNestedNodeTree";
-    private final String version = versionId+"-"+versionType;
+    private final String version = versionId + "-" + versionType;
 
     public void validate(Project configProject) throws OperationIncompleteException {
         try {

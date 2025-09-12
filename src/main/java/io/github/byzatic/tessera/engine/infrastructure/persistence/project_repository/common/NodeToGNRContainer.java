@@ -13,7 +13,7 @@ public class NodeToGNRContainer {
     public NodeToGNRContainer(Map<GraphNodeRef, NodeItem> graphNodeRefNodeItemMap) {
         this.graphNodeRefNodeItemMap = graphNodeRefNodeItemMap;
     }
-    
+
     public List<GraphNodeRef> getAllGraphNodeRef() {
         return new ArrayList<>(graphNodeRefNodeItemMap.keySet());
     }
@@ -22,7 +22,7 @@ public class NodeToGNRContainer {
         if (graphNodeRefNodeItemMap.containsKey(graphNodeRef)) {
             return graphNodeRefNodeItemMap.get(graphNodeRef);
         } else {
-            String errMessage = "Node with GraphNodeRef "+ graphNodeRef + " not exists";
+            String errMessage = "Node with GraphNodeRef " + graphNodeRef + " not exists";
             throw new RuntimeException(errMessage);
         }
     }

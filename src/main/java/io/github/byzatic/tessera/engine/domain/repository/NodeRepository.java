@@ -18,6 +18,7 @@ public interface NodeRepository {
 
     // NODE GLOBAL
     @NotNull NodeGlobal getNodeGlobal(@NotNull GraphNodeRef graphNodeRef) throws OperationIncompleteException;
+
     @NotNull Boolean isNodeStorageDeclaration(@NotNull GraphNodeRef graphNodeRef, @NotNull String storageName);
 
     // NODE PIPELINE

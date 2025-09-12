@@ -27,7 +27,7 @@ public class StorageManager implements StorageManagerInterface {
 
     public StorageManager(@NotNull FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
         this.fullProjectRepository = fullProjectRepository;
-        if (! Configuration.INITIALIZE_STORAGE_BY_REQUEST) {
+        if (!Configuration.INITIALIZE_STORAGE_BY_REQUEST) {
             for (StoragesItem storageGlobal : fullProjectRepository.getGlobal().getStorages()) {
                 if (storageGlobal.getIdName() == null || Objects.equals(storageGlobal.getIdName(), "")) {
                     throw new OperationIncompleteException("Global storage should have name -> " + storageGlobal);
@@ -63,7 +63,7 @@ public class StorageManager implements StorageManagerInterface {
             }
             logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} storageItemId -> {} is storageItem -> {}", graphNodeRef, storageId, storageItemId, storageItem);
             return storageItem;
-        } catch (Exception e ) {
+        } catch (Exception e) {
             throw new OperationIncompleteException(e.getMessage(), e);
         }
     }
@@ -80,7 +80,7 @@ public class StorageManager implements StorageManagerInterface {
                 storage.create(dataLookupIdentifierInterface, storageItem);
             }
             logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} dataLookupIdentifierInterface -> {} storageItem -> {} is complete", graphNodeRef, storageId, dataLookupIdentifierInterface, storageItem);
-        } catch (Exception e ) {
+        } catch (Exception e) {
             throw new OperationIncompleteException(e.getMessage(), e);
         }
     }
@@ -88,13 +88,13 @@ public class StorageManager implements StorageManagerInterface {
     private StorageInterface<DataValueInterface> searchNodeStorage(GraphNodeRef graphNodeRef, String storageId) throws OperationIncompleteException {
         StorageInterface<DataValueInterface> result;
 
-        if (! fullProjectRepository.isNodeStorageDeclaration(graphNodeRef, storageId)) {
+        if (!fullProjectRepository.isNodeStorageDeclaration(graphNodeRef, storageId)) {
             String errMessage = "No such Node " + graphNodeRef.getNodeUUID() + " storage " + storageId + " defined in ConfigProject";
             logger.error(errMessage);
             throw new OperationIncompleteException(errMessage);
         }
 
-        if (! isNodeStorageExists(graphNodeRef, storageId)) {
+        if (!isNodeStorageExists(graphNodeRef, storageId)) {
             initializeNodeStorage(graphNodeRef, storageId);
         }
 
@@ -185,14 +185,14 @@ public class StorageManager implements StorageManagerInterface {
     private StorageInterface<DataValueInterface> searchGlobalStorage(@NotNull String storageId) throws OperationIncompleteException {
         StorageInterface<DataValueInterface> result;
 
-        if (! globalStorageMap.containsKey(storageId)) {
+        if (!globalStorageMap.containsKey(storageId)) {
             String errMessage = "No such Global storage " + storageId + " defined in ConfigProject";
             logger.error(errMessage);
             logger.error("{}", globalStorageMap);
             throw new OperationIncompleteException(errMessage);
         }
 
-        if (! isGlobalStorageExists(storageId)) {
+        if (!isGlobalStorageExists(storageId)) {
             initializeGlobalStorage(storageId);
         }
 

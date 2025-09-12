@@ -18,7 +18,7 @@ public class NodeContainer {
     private final List<GraphNodeRef> graphNodeRefList;
 
     public NodeContainer(Map<GraphNodeRef, NodeItem> nodeMap, Map<GraphNodeRef, NodeGlobal> nodeGlobalMap, Map<GraphNodeRef, NodePipeline> nodePipelineMap) {
-        this.nodeMap= new HashMap<>(nodeMap);
+        this.nodeMap = new HashMap<>(nodeMap);
         this.graphNodeRefList = new ArrayList<>(nodeMap.keySet());
         this.nodeGlobalMap = nodeGlobalMap;
         this.nodePipelineMap = nodePipelineMap;

@@ -1,28 +1,19 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager;
 
-import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.commons.schedulers.immediate.*;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
-
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversal;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversalInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository.GraphManagerNodeRepositoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerFactoryInterface;
-
-import io.github.byzatic.commons.schedulers.immediate.CancellationToken;
-import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;
-import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
-import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
-import io.github.byzatic.commons.schedulers.immediate.JobInfo;
-import io.github.byzatic.commons.schedulers.immediate.JobState;
-import io.github.byzatic.commons.schedulers.immediate.Task;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.*;
@@ -31,11 +22,11 @@ import java.util.concurrent.CountDownLatch;
 
 /**
  * GraphManager с использованием ImmediateScheduler.
- *
+ * <p>
  * Поведение не менялось:
- *  - Берём корневые узлы графа из GraphManagerNodeRepositoryInterface.
- *  - Для каждого корневого узла планируем задачу, которая делегирует обход в GraphTraversal.
- *  - Ждём завершения всех задач; если любая завершилась не COMPLETED — бросаем OperationIncompleteException.
+ * - Берём корневые узлы графа из GraphManagerNodeRepositoryInterface.
+ * - Для каждого корневого узла планируем задачу, которая делегирует обход в GraphTraversal.
+ * - Ждём завершения всех задач; если любая завершилась не COMPLETED — бросаем OperationIncompleteException.
  */
 public class GraphManager implements GraphManagerInterface {
 
@@ -50,7 +41,9 @@ public class GraphManager implements GraphManagerInterface {
     private final boolean ownsScheduler;
     private StorageManagerInterface storageManager;
 
-    /** Конструктор с внешним шедуллером (рекомендуемый для совместного использования в оркестрации). */
+    /**
+     * Конструктор с внешним шедуллером (рекомендуемый для совместного использования в оркестрации).
+     */
     public GraphManager(@NotNull StorageManagerInterface storageManager,
                         @NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
                         @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
@@ -83,7 +76,9 @@ public class GraphManager implements GraphManagerInterface {
         this.scheduler.addListener(new SilentLoggingListener());
     }
 
-    /** Конструктор, создающий собственный ImmediateScheduler. */
+    /**
+     * Конструктор, создающий собственный ImmediateScheduler.
+     */
     public GraphManager(@NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
                         @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
                         JobEventListener... listeners) {
@@ -133,16 +128,36 @@ public class GraphManager implements GraphManagerInterface {
                     JobState s = info.get().state;
                     return s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT;
                 }
+
                 private void maybeCountDown(UUID id) {
                     if (id != null && jobIdSet.contains(id) && isTerminal(id)) {
                         barrier.countDown();
                     }
                 }
-                @Override public void onStart(UUID jobId) {}
-                @Override public void onComplete(UUID jobId) { maybeCountDown(jobId); }
-                @Override public void onError(UUID jobId, Throwable error) { maybeCountDown(jobId); }
-                @Override public void onTimeout(UUID jobId) { maybeCountDown(jobId); }
-                @Override public void onCancelled(UUID jobId) { maybeCountDown(jobId); }
+
+                @Override
+                public void onStart(UUID jobId) {
+                }
+
+                @Override
+                public void onComplete(UUID jobId) {
+                    maybeCountDown(jobId);
+                }
+
+                @Override
+                public void onError(UUID jobId, Throwable error) {
+                    maybeCountDown(jobId);
+                }
+
+                @Override
+                public void onTimeout(UUID jobId) {
+                    maybeCountDown(jobId);
+                }
+
+                @Override
+                public void onCancelled(UUID jobId) {
+                    maybeCountDown(jobId);
+                }
             };
             scheduler.addListener(stageListener);
 
@@ -184,7 +199,10 @@ public class GraphManager implements GraphManagerInterface {
                 // Снимаем stage-listener и убираем задачи из реестра шедуллера.
                 scheduler.removeListener(stageListener);
                 for (UUID id : jobIds) {
-                    try { scheduler.removeTask(id); } catch (Throwable ignore) {}
+                    try {
+                        scheduler.removeTask(id);
+                    } catch (Throwable ignore) {
+                    }
                 }
                 clear();
             }
@@ -195,7 +213,10 @@ public class GraphManager implements GraphManagerInterface {
         } finally {
             // Если шедуллер наш — закрываем ресурсы.
             if (ownsScheduler) {
-                try { scheduler.close(); } catch (Exception ignored) {}
+                try {
+                    scheduler.close();
+                } catch (Exception ignored) {
+                }
             }
             clear();
         }
@@ -212,7 +233,9 @@ public class GraphManager implements GraphManagerInterface {
         }
     }
 
-    /** Адаптер: делегирует в прежний GraphTraversal. */
+    /**
+     * Адаптер: делегирует в прежний GraphTraversal.
+     */
     private static final class RootTraversalTask implements Task {
         private final GraphTraversalInterface traversal;
         private final Node root;
@@ -235,12 +258,28 @@ public class GraphManager implements GraphManagerInterface {
         }
     }
 
-    /** Тихий внутренний логер событий ImmediateScheduler (опционально). */
+    /**
+     * Тихий внутренний логер событий ImmediateScheduler (опционально).
+     */
     private static final class SilentLoggingListener implements JobEventListener {
-        @Override public void onStart(UUID jobId) {}
-        @Override public void onComplete(UUID jobId) {}
-        @Override public void onError(UUID jobId, Throwable error) {}
-        @Override public void onTimeout(UUID jobId) {}
-        @Override public void onCancelled(UUID jobId) {}
+        @Override
+        public void onStart(UUID jobId) {
+        }
+
+        @Override
+        public void onComplete(UUID jobId) {
+        }
+
+        @Override
+        public void onError(UUID jobId, Throwable error) {
+        }
+
+        @Override
+        public void onTimeout(UUID jobId) {
+        }
+
+        @Override
+        public void onCancelled(UUID jobId) {
+        }
     }
 }

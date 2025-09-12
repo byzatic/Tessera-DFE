@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
 
 public class StructureController implements StructureControllerInterface {
-    private final static Logger logger= LoggerFactory.getLogger(StructureController.class);
+    private final static Logger logger = LoggerFactory.getLogger(StructureController.class);
     private final Path projectsDirectory;
 
     public StructureController(String projectName) {
@@ -21,12 +21,12 @@ public class StructureController implements StructureControllerInterface {
     @Override
     public NodeStructure getNodeStructure(GraphNodeRef graphNodeRef, NodeToGNRContainer nodeToGNRContainer) {
         try {
-            NodeItem node= nodeToGNRContainer.getNode(graphNodeRef);
+            NodeItem node = nodeToGNRContainer.getNode(graphNodeRef);
             String nodeFolderName = node.getId();
             if (node.getId().equals("#NAMED")) {
-                nodeFolderName= node.getName();
+                nodeFolderName = node.getName();
             } else {
-                nodeFolderName= node.getId() + "-" + node.getName();
+                nodeFolderName = node.getId() + "-" + node.getName();
             }
             Path nodePath = projectsDirectory.resolve("data").resolve("nodes").resolve(nodeFolderName);
             Path nodeConfigurationFilesPath = nodePath.resolve("configuration_files");

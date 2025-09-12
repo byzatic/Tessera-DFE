@@ -5,8 +5,8 @@ import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 import io.github.byzatic.tessera.engine.domain.model.node_global.NodeGlobal;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.NodePipeline;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectLoaderInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.GlobalContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.NodeContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.SharedResourcesContainer;
@@ -47,7 +47,7 @@ public class ProjectV1Loader implements ProjectLoaderInterface {
         try {
             NodeContainer nodeContainer = null;
 
-            Map<GraphNodeRef, NodeItem>  graphNodeRefNodeItemMap = projectDao.load().getNodeMap();
+            Map<GraphNodeRef, NodeItem> graphNodeRefNodeItemMap = projectDao.load().getNodeMap();
             NodeToGNRContainer nodeToGNRContainer = new NodeToGNRContainer(graphNodeRefNodeItemMap);
             Map<GraphNodeRef, NodeGlobal> graphNodeRefNodeGlobalMap = nodeGlobalDao.load(projectName, nodeToGNRContainer);
             Map<GraphNodeRef, NodePipeline> graphNodeRefNodePipelineMap = pipelineDao.load(projectName, nodeToGNRContainer);

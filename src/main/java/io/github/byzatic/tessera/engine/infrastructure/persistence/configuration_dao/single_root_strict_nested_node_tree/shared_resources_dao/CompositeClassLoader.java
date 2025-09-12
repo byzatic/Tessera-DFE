@@ -20,7 +20,8 @@ class CompositeClassLoader extends ClassLoader {
         for (ClassLoader cl : delegates) {
             try {
                 return cl.loadClass(name);
-            } catch (ClassNotFoundException ignored) {}
+            } catch (ClassNotFoundException ignored) {
+            }
         }
         throw new ClassNotFoundException(name);
     }

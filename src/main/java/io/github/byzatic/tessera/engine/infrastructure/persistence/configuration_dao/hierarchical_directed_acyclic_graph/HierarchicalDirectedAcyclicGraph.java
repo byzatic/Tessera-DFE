@@ -7,7 +7,7 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.configuratio
  * - acyclic and directed relationships between nodes,
  * - support for multiple parents per jpa_like_node_repository,
  * - logical hierarchy layered by domain-specific levels (e.g., jpa_like_project_global_repository → group → host → hardware).
- *
+ * <p>
  * This structure models flexible but cycle-free data topologies used for:
  * - dependency resolution in data aggregation,
  * - distributed workflow modeling,
