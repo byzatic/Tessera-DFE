@@ -185,7 +185,7 @@ jobs:
           echo "pom_version=$V" >> "$GITHUB_OUTPUT"
           echo "POM version: $V"
 
-      - name: Guard: forbid SNAPSHOT on main
+      - name: "Guard: forbid SNAPSHOT on main"
         if: steps.vars.outputs.branch_name == 'main'
         shell: bash
         run: |
@@ -213,14 +213,14 @@ jobs:
             $( [[ "${{ steps.vars.outputs.branch_name }}" == "main" ]] && echo "--tag docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.pom.outputs.pom_version }}" ) \
             --file Dockerfile .
 
-      - name: Push image: sha and branch
+      - name: "Push image: sha and branch"
         shell: bash
         run: |
           set -euo pipefail
           buildah push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:sha-${{ steps.vars.outputs.short_sha }}
           buildah push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.branch_name }}
 
-      - name: Push image: latest, main, and version
+      - name: "Push image: latest, main, and version"
         if: steps.vars.outputs.branch_name == 'main'
         shell: bash
         run: |
