@@ -41,14 +41,15 @@ COPY --from=build /temp_1/configurations /app/configurations
 COPY --from=build /temp_1/logs /app/logs
 
 # Copy the jar from the build stage
-COPY --from=build /app/target/tessera-dfe-*-SNAPSHOT-jar-with-dependencies.jar /app/app.jar
+#COPY --from=build /app/target/tessera-dfe-*-SNAPSHOT-jar-with-dependencies.jar /app/app.jar
+COPY --from=build /app/target/tessera-dfe-*-jar-with-dependencies.jar /app/app.jar
 
 # Copy the docker-entrypoint
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
 ## Set the environment variables
 ENV CONFIG_PATH="/app/configuration/configuration.xml"
-ENV GRAPH_CALCULATION_CRON_CYCLE="*/10 * * * * ?"
+ENV GRAPH_CALCULATION_CRON_CYCLE="*/10 * * * * *"
 
 ## Run the application
 ENTRYPOINT ["/bin/bash", "/app/docker-entrypoint.sh"]

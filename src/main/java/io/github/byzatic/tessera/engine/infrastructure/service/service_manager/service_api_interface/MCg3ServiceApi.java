@@ -1,9 +1,9 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface;
 
-import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
 import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
 import io.github.byzatic.tessera.service.configuration.ServiceConfigurationParameter;
 import io.github.byzatic.tessera.service.execution_context.ExecutionContextInterface;
+import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -18,9 +18,12 @@ public class MCg3ServiceApi implements MCg3ServiceApiInterface {
     }
 
     private MCg3ServiceApi(Builder builder) {
-        if (builder.storageApi == null) throw new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + StorageApiInterface.class.getSimpleName());
-        if (builder.serviceConfigurationParameters == null) throw new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + StorageApiInterface.class.getSimpleName());
-        if (builder.executionContext == null) throw new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + StorageApiInterface.class.getSimpleName());
+        if (builder.storageApi == null)
+            throw new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + StorageApiInterface.class.getSimpleName());
+        if (builder.serviceConfigurationParameters == null)
+            throw new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + StorageApiInterface.class.getSimpleName());
+        if (builder.executionContext == null)
+            throw new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + StorageApiInterface.class.getSimpleName());
         storageApi = builder.storageApi;
         serviceConfigurationParameters = builder.serviceConfigurationParameters;
         executionContext = builder.executionContext;

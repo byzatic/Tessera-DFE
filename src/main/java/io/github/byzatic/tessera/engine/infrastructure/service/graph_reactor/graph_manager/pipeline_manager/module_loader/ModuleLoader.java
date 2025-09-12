@@ -1,14 +1,14 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader;
 
+import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
+import io.github.byzatic.tessera.workflowroutine.api_engine.MCg3WorkflowRoutineApiInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineFactoryInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
+import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
-import io.github.byzatic.tessera.engine.domain.repository.SharedResourcesRepositoryInterface;
-import io.github.byzatic.tessera.workflowroutine.api_engine.MCg3WorkflowRoutineApiInterface;
-import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineFactoryInterface;
-import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
-import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
 
 import java.io.File;
 import java.net.URL;
@@ -23,14 +23,15 @@ public class ModuleLoader implements ModuleLoaderInterface {
     private final Map<String, WorkflowRoutineFactoryInterface> moduleFactories = new HashMap<>();
     private final Map<String, URLClassLoader> classLoaders = new HashMap<>();
 
-    public ModuleLoader(Path pluginsDirPath, SharedResourcesRepositoryInterface sharedResourcesManager) throws OperationIncompleteException {
-        load(pluginsDirPath, sharedResourcesManager);
+    public ModuleLoader(Path pluginsDirPath, FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
+        load(pluginsDirPath, fullProjectRepository);
     }
 
     @Override
     public synchronized WorkflowRoutineInterface getModule(String workflowRoutineClassName, MCg3WorkflowRoutineApiInterface workflowRoutineApi, HealthFlagProxy healthFlagProxy) throws OperationIncompleteException {
         try {
-            if (!moduleFactories.containsKey(workflowRoutineClassName)) throw new OperationIncompleteException("Service with name " + workflowRoutineClassName + " was not found");
+            if (!moduleFactories.containsKey(workflowRoutineClassName))
+                throw new OperationIncompleteException("Service with name " + workflowRoutineClassName + " was not found");
             WorkflowRoutineFactoryInterface moduleFactory = moduleFactories.get(workflowRoutineClassName);
             return moduleFactory.create(workflowRoutineApi, healthFlagProxy);
         } catch (Exception e) {
@@ -39,8 +40,8 @@ public class ModuleLoader implements ModuleLoaderInterface {
         }
     }
 
-    private void load(Path pluginsDirPath, SharedResourcesRepositoryInterface sharedResourcesManager) throws OperationIncompleteException {
-        @Nullable ClassLoader sharedResources = sharedResourcesManager.getSharedResourcesClassLoader();
+    private void load(Path pluginsDirPath, FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
+        @Nullable ClassLoader sharedResources = fullProjectRepository.getSharedResourcesClassLoader();
         File[] jars = null;
         try {
             jars = pluginsDirPath.toFile().listFiles((dir, name) -> name.endsWith(".jar"));
@@ -88,7 +89,8 @@ public class ModuleLoader implements ModuleLoaderInterface {
                     String moduleName = dummy.getClass().getSimpleName().replace("Factory", "");
                     logger.debug("Discovered module: {}", moduleName);
 
-                    if (moduleFactories.containsKey(moduleName)) throw new OperationIncompleteException("Found another module with name " + moduleName + " (module duplication)");
+                    if (moduleFactories.containsKey(moduleName))
+                        throw new OperationIncompleteException("Found another module with name " + moduleName + " (module duplication)");
 
                     WorkflowRoutineFactoryInterface moduleFactory = dummy.getClass().getDeclaredConstructor().newInstance();
                     logger.debug("Service Factory created: {}", moduleFactory);

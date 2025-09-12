@@ -1,32 +1,32 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface;
 
-import org.apache.commons.math3.util.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
+import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
+import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
 import io.github.byzatic.tessera.storageapi.dto.StorageItem;
 import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncompleteException;
 import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
-import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
-import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
-import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import org.apache.commons.math3.util.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class StorageApi implements StorageApiInterface {
-    private final static Logger logger= LoggerFactory.getLogger(StorageApi.class);
+    private final static Logger logger = LoggerFactory.getLogger(StorageApi.class);
     private final GraphNodeRef graphNodeRef;
-    private final JpaLikeNodeRepositoryInterface nodeRepository;
+    private final FullProjectRepository fullProjectRepository;
     private StorageManagerInterface storageManager;
 
-    public StorageApi(StorageManagerInterface storageManager, GraphNodeRef graphNodeRef, JpaLikeNodeRepositoryInterface nodeRepository) {
+    public StorageApi(StorageManagerInterface storageManager, GraphNodeRef graphNodeRef, FullProjectRepository fullProjectRepository) {
         this.storageManager = storageManager;
         this.graphNodeRef = graphNodeRef;
-        this.nodeRepository = nodeRepository;
+        this.fullProjectRepository = fullProjectRepository;
     }
 
     private GraphNodeRef searchDownstreamGraphNodeRefByNodeId(StorageItem storageItem) throws MCg3ApiOperationIncompleteException {
@@ -37,11 +37,11 @@ public class StorageApi implements StorageApiInterface {
             ObjectsUtils.requireNonNull(downstreamNodeId, new IllegalArgumentException("Downstream node name should be NotNull"));
             logger.debug("Searching downstream GraphNodeRef by node ID {}", downstreamNodeId);
 
-            NodeItem currentNode = nodeRepository.getNode(graphNodeRef);
+            NodeItem currentNode = fullProjectRepository.getNode(graphNodeRef);
             List<GraphNodeRef> downstreamGraphNodeRefList = currentNode.getDownstream();
 
             for (GraphNodeRef downstreamGraphNodeRef : downstreamGraphNodeRefList) {
-                NodeItem downstreamNodeItem = nodeRepository.getNode(downstreamGraphNodeRef);
+                NodeItem downstreamNodeItem = fullProjectRepository.getNode(downstreamGraphNodeRef);
                 logger.debug("Processing search {} for {} and {}", downstreamNodeId, downstreamGraphNodeRef, downstreamNodeItem);
                 if (downstreamNodeItem.getId().equals(downstreamNodeId)) {
                     requestedDownstreamGraphNodeRef = downstreamGraphNodeRef;
@@ -57,7 +57,7 @@ public class StorageApi implements StorageApiInterface {
             }
 
             logger.debug("Searching downstream GraphNodeRef by node ID {} complete; result is {}", downstreamNodeId, requestedDownstreamGraphNodeRef);
-            ObjectsUtils.requireNonNull(requestedDownstreamGraphNodeRef, new MCg3ApiOperationIncompleteException("Node with name "+storageItem.getDownstreamName()+" was not found"));
+            ObjectsUtils.requireNonNull(requestedDownstreamGraphNodeRef, new MCg3ApiOperationIncompleteException("Node with name " + storageItem.getDownstreamName() + " was not found"));
             return requestedDownstreamGraphNodeRef;
         } catch (Exception e) {
             throw new MCg3ApiOperationIncompleteException(e);

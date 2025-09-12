@@ -1,14 +1,14 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_loader;
 
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
-import io.github.byzatic.tessera.engine.domain.repository.SharedResourcesRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
 import io.github.byzatic.tessera.service.service.ServiceFactoryInterface;
 import io.github.byzatic.tessera.service.service.ServiceInterface;
 import io.github.byzatic.tessera.service.service.health.HealthFlagProxy;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URL;
@@ -23,14 +23,15 @@ public class ServiceLoader implements ServiceLoaderInterface {
     private final Map<String, ServiceFactoryInterface> serviceFactories = new HashMap<>();
     private final Map<String, URLClassLoader> classLoaders = new HashMap<>();
 
-    public ServiceLoader(Path pluginsDirPath, SharedResourcesRepositoryInterface sharedResourcesManager) throws OperationIncompleteException {
-        load(pluginsDirPath, sharedResourcesManager);
+    public ServiceLoader(Path pluginsDirPath, FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
+        load(pluginsDirPath, fullProjectRepository);
     }
 
     @Override
     public synchronized ServiceInterface getService(String serviceName, MCg3ServiceApiInterface serviceApi, HealthFlagProxy healthFlagProxy) throws OperationIncompleteException {
         try {
-            if (!serviceFactories.containsKey(serviceName)) throw new OperationIncompleteException("Service with name " + serviceName + " was not found");
+            if (!serviceFactories.containsKey(serviceName))
+                throw new OperationIncompleteException("Service with name " + serviceName + " was not found");
             ServiceFactoryInterface serviceFactory = serviceFactories.get(serviceName);
             return serviceFactory.create(serviceApi, healthFlagProxy);
         } catch (Exception e) {
@@ -39,8 +40,8 @@ public class ServiceLoader implements ServiceLoaderInterface {
         }
     }
 
-    private void load(Path pluginsDirPath, SharedResourcesRepositoryInterface sharedResourcesManager) throws OperationIncompleteException {
-        @Nullable ClassLoader sharedResources = sharedResourcesManager.getSharedResourcesClassLoader();
+    private void load(Path pluginsDirPath, FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
+        @Nullable ClassLoader sharedResources = fullProjectRepository.getSharedResourcesClassLoader();
         File[] jars = null;
         try {
             jars = pluginsDirPath.toFile().listFiles((dir, name) -> name.endsWith(".jar"));
@@ -88,7 +89,8 @@ public class ServiceLoader implements ServiceLoaderInterface {
                     String serviceName = dummy.getClass().getSimpleName().replace("Factory", "");
                     logger.debug("Discovered service: {}", serviceName);
 
-                    if (serviceFactories.containsKey(serviceName)) throw new OperationIncompleteException("Found another service with name " + serviceName + " (service duplication)");
+                    if (serviceFactories.containsKey(serviceName))
+                        throw new OperationIncompleteException("Found another service with name " + serviceName + " (service duplication)");
 
                     ServiceFactoryInterface serviceFactory = dummy.getClass().getDeclaredConstructor().newInstance();
                     logger.debug("Service Factory created: {}", serviceFactory);

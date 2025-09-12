@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.application.commons.logging;
 
-import org.slf4j.MDC;
 import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
+import org.slf4j.MDC;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -115,7 +115,7 @@ public class MdcServiceContext implements MdcContextInterface {
          * @return a {@code MdcContext} built with parameters of this {@code MdcContext.Builder}
          */
         public MdcServiceContext build() {
-            String msgString = "type=Service"+" "+this.serviceName;
+            String msgString = "type=Service" + " " + this.serviceName;
             contextMap.put(msgName, msgString);
             return new MdcServiceContext(this);
         }

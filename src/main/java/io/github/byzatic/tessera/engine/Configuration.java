@@ -17,9 +17,9 @@ import java.nio.file.Paths;
 public class Configuration {
     private final static Logger logger = LoggerFactory.getLogger(Configuration.class);
     public final static MdcContextInterface MDC_ENGINE_CONTEXT = MdcEngineContext.newBuilder().build();
-    public static final String APP_NAME = "metrics-core-gen-3";
-    public static final String APP_VERSION = "1.0";
-
+    public static final String APP_NAME = "Tessera-DFE";
+    public static String APP_VERSION;
+    public static String SPECIFICATION_VERSION;
     public static final Path WORKING_DIR = Paths.get(System.getProperty("user.dir"));
 
     public static final TempDirectory TEMP_DIRECTORY = new TempDirectory(Configuration.APP_NAME, Boolean.TRUE);
@@ -218,6 +218,38 @@ public class Configuration {
         return result;
     }
 
+    public static String readSpecificationVersion() {
+        String version = "UNDEFINED";
+        String packageVersion = Configuration.class.getPackage().getSpecificationVersion();;
+        if (packageVersion != null) {
+            version= packageVersion;
+        } try (var resourceVersionStream = Configuration.class.getClassLoader().getResourceAsStream("version.properties")) {
+            if (resourceVersionStream != null) {
+                var props = new java.util.Properties();
+                props.load(resourceVersionStream);
+                String resourceVersion = props.getProperty("app.specification_version");
+                if (resourceVersion != null && !resourceVersion.isBlank()) version = resourceVersion;
+            }
+        } catch (Exception ignored) {}
+        return version;
+    }
+
+    public static String readImplementationVersion() {
+        String version = "UNDEFINED";
+        String packageVersion = Configuration.class.getPackage().getImplementationVersion();;
+        if (packageVersion != null) {
+            version= packageVersion;
+        } try (var resourceVersionStream = Configuration.class.getClassLoader().getResourceAsStream("version.properties")) {
+            if (resourceVersionStream != null) {
+                var props = new java.util.Properties();
+                props.load(resourceVersionStream);
+                String resourceVersion = props.getProperty("app.implementation_version");
+                if (resourceVersion != null && !resourceVersion.isBlank()) version = resourceVersion;
+            }
+        } catch (Exception ignored) {}
+        return version;
+    }
+
 
     static {
         MdcContextInterface mdcEngineContext = MdcEngineContext.newBuilder().build();
@@ -225,6 +257,10 @@ public class Configuration {
         Configurations configs = new Configurations();
         try (AutoCloseable ignored = mdcEngineContext.use()) {
             logger.debug("Configure instance.");
+
+            APP_VERSION = readImplementationVersion();
+
+            SPECIFICATION_VERSION = readSpecificationVersion();
 
             CONFIGURATION_FILE_PATH = initConfigFilePath();
 

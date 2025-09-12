@@ -1,35 +1,32 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.path_manager;
+package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_controller;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 
-public class StructureManager implements StructureManagerInterface {
-    private final static Logger logger= LoggerFactory.getLogger(StructureManager.class);
-    private final JpaLikeNodeRepositoryInterface jpaLikeNodeRepository;
+public class StructureController implements StructureControllerInterface {
+    private final static Logger logger = LoggerFactory.getLogger(StructureController.class);
     private final Path projectsDirectory;
 
-    public StructureManager(JpaLikeNodeRepositoryInterface jpaLikeNodeRepository, String projectName) {
-        this.jpaLikeNodeRepository = jpaLikeNodeRepository;
-
+    public StructureController(String projectName) {
         //TODO: check if exists
         this.projectsDirectory = Configuration.PROJECTS_DIR.resolve(projectName);
     }
 
     @Override
-    public NodeStructure getNodeStructure(GraphNodeRef graphNodeRef) {
+    public NodeStructure getNodeStructure(GraphNodeRef graphNodeRef, NodeToGNRContainer nodeToGNRContainer) {
         try {
-            NodeItem node= this.jpaLikeNodeRepository.getNode(graphNodeRef);
+            NodeItem node = nodeToGNRContainer.getNode(graphNodeRef);
             String nodeFolderName = node.getId();
             if (node.getId().equals("#NAMED")) {
-                nodeFolderName= node.getName();
+                nodeFolderName = node.getName();
             } else {
-                nodeFolderName= node.getId() + "-" + node.getName();
+                nodeFolderName = node.getId() + "-" + node.getName();
             }
             Path nodePath = projectsDirectory.resolve("data").resolve("nodes").resolve(nodeFolderName);
             Path nodeConfigurationFilesPath = nodePath.resolve("configuration_files");

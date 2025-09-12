@@ -4,7 +4,8 @@
 
   <groupId>io.github.byzatic.tessera</groupId>
   <artifactId>tessera-dfe</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <!--<version>0.1.2-SNAPSHOT</version>-->
+  <version>0.1.2</version>
   <packaging>jar</packaging>
 
   <name>Tessera-DFE</name>
@@ -164,7 +165,26 @@
 
   <!-- manual set -->
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
     <plugins>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>templating-maven-plugin</artifactId>
+        <version>1.0.0</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>filter-sources</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -204,10 +224,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <version>2.4</version>
+        <version>3.3.0</version>
         <configuration>
           <archive>
             <manifest>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
               <addClasspath>true</addClasspath>
               <mainClass>${fully.qualified.main.class}</mainClass>
               <classpathPrefix>lib/</classpathPrefix>
@@ -215,6 +237,7 @@
             <manifestEntries>
               <Implementation-Title>${project.artifactId}</Implementation-Title>
               <Implementation-Version>${project.version}</Implementation-Version>
+              <Specification-Version>${project.version}</Specification-Version>
             </manifestEntries>
           </archive>
         </configuration>
@@ -247,6 +270,11 @@
             <manifest>
               <mainClass>${fully.qualified.main.class}</mainClass>
             </manifest>
+            <manifestEntries>
+              <Implementation-Title>${project.artifactId}</Implementation-Title>
+              <Implementation-Version>${project.version}</Implementation-Version>
+              <Specification-Version>${project.version}</Specification-Version>
+            </manifestEntries>
           </archive>
           <descriptorRefs>
             <descriptorRef>jar-with-dependencies</descriptorRef>
@@ -275,9 +303,13 @@
             <configuration>
               <shadedArtifactAttached>true</shadedArtifactAttached>
               <transformers>
-                <transformer
-                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <mainClass>${fully.qualified.main.class}</mainClass>
+                  <manifestEntries>
+                    <Implementation-Title>${project.artifactId}</Implementation-Title>
+                    <Implementation-Version>${project.version}</Implementation-Version>
+                    <Specification-Version>${project.version}</Specification-Version>
+                  </manifestEntries>
                 </transformer>
               </transformers>
             </configuration>

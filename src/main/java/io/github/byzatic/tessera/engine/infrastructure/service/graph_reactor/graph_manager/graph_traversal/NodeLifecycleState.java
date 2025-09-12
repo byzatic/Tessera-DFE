@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal;
 
-import org.jetbrains.annotations.NotNull;
 import io.github.byzatic.commons.ObjectsUtils;
+import org.jetbrains.annotations.NotNull;
 
 public enum NodeLifecycleState {
     NOTSTATED(0),
@@ -26,6 +26,7 @@ public enum NodeLifecycleState {
 
     /**
      * Метод, чтобы получить enum по числу
+     *
      * @param code
      * @return
      */

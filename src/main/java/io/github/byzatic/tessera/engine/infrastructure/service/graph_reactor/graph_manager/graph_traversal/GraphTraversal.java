@@ -1,18 +1,21 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal;
 
+import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository.GraphManagerNodeRepositoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerFactoryInterface;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -190,6 +193,7 @@ public class GraphTraversal implements GraphTraversalInterface {
     private static final class NodePathState {
         final Node node;
         final List<Node> pathSoFar;
+
         NodePathState(Node node, List<Node> pathSoFar) {
             this.node = node;
             this.pathSoFar = pathSoFar;

@@ -3,7 +3,7 @@ package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gr
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,8 +13,8 @@ public class GraphPathManager implements GraphPathManagerInterface {
 
     private final GraphPathFinderIterative graphPathFinderIterative;
 
-    public GraphPathManager(JpaLikeNodeRepositoryInterface nodeRepository) {
-        this.graphPathFinderIterative = new GraphPathFinderIterative(nodeRepository);
+    public GraphPathManager(FullProjectRepository fullProjectRepository) {
+        this.graphPathFinderIterative = new GraphPathFinderIterative(fullProjectRepository);
     }
 
     @Override

@@ -1,7 +1,7 @@
 package io.github.byzatic.tessera.engine.application.commons.logging;
 
-import org.slf4j.MDC;
 import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
+import org.slf4j.MDC;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -155,7 +155,7 @@ public class MdcWorkflowRoutineContext implements MdcContextInterface {
          * @return a {@code MdcContext} built with parameters of this {@code MdcContext.Builder}
          */
         public MdcWorkflowRoutineContext build() {
-            String msgString = "type=WorkflowRoutine"+" "+this.node+"::"+this.stageId+":"+this.stage+"|"+this.routine+":"+this.routineId;
+            String msgString = "type=WorkflowRoutine" + " " + this.node + "::" + this.stageId + ":" + this.stage + "|" + this.routine + ":" + this.routineId;
             contextMap.put(msgName, msgString);
             return new MdcWorkflowRoutineContext(this);
         }

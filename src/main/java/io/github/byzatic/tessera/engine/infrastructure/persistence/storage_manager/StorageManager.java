@@ -1,20 +1,18 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager;
 
-import org.apache.commons.math3.util.Pair;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.project.StoragesItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeGlobalRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeProjectGlobalRepositoryInterface;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.storage.Storage;
+import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
+import org.apache.commons.math3.util.Pair;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -25,22 +23,20 @@ public class StorageManager implements StorageManagerInterface {
     private final static Logger logger = LoggerFactory.getLogger(StorageManager.class);
     private final Map<GraphNodeRef, Map<String, StorageInterface<DataValueInterface>>> nodeStorageMap = new ConcurrentHashMap<GraphNodeRef, Map<String, StorageInterface<DataValueInterface>>>();
     private final Map<String, StorageInterface<DataValueInterface>> globalStorageMap = new ConcurrentHashMap<>();
-    private JpaLikeNodeGlobalRepositoryInterface nodeGlobalRepository = null;
-    private JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository = null;
+    private final FullProjectRepository fullProjectRepository;
 
-    public StorageManager(@NotNull JpaLikeNodeGlobalRepositoryInterface nodeGlobalRepository, @NotNull JpaLikeProjectGlobalRepositoryInterface projectGlobalRepository, @NotNull JpaLikeNodeRepositoryInterface nodeRepository) throws OperationIncompleteException {
-        this.nodeGlobalRepository = nodeGlobalRepository;
-        this.projectGlobalRepository = projectGlobalRepository;
-        if (! Configuration.INITIALIZE_STORAGE_BY_REQUEST) {
-            for (StoragesItem storageGlobal : projectGlobalRepository.getProjectGlobal().getStorages()) {
+    public StorageManager(@NotNull FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
+        this.fullProjectRepository = fullProjectRepository;
+        if (!Configuration.INITIALIZE_STORAGE_BY_REQUEST) {
+            for (StoragesItem storageGlobal : fullProjectRepository.getGlobal().getStorages()) {
                 if (storageGlobal.getIdName() == null || Objects.equals(storageGlobal.getIdName(), "")) {
                     throw new OperationIncompleteException("Global storage should have name -> " + storageGlobal);
                 }
                 String storageId = storageGlobal.getIdName();
                 initializeGlobalStorage(storageId);
             }
-            for (GraphNodeRef graphNodeRef : nodeRepository.getAllGraphNodeRef()) {
-                for (io.github.byzatic.tessera.engine.domain.model.node_global.StoragesItem storageNode : nodeGlobalRepository.getNodeGlobal(graphNodeRef).getStorages()) {
+            for (GraphNodeRef graphNodeRef : fullProjectRepository.listGraphNodeRef()) {
+                for (io.github.byzatic.tessera.engine.domain.model.node_global.StoragesItem storageNode : fullProjectRepository.getNodeGlobal(graphNodeRef).getStorages()) {
                     String storageName = storageNode.getIdName();
                     if (storageName == null || Objects.equals(storageName, "")) {
                         throw new OperationIncompleteException("Node storage should have name -> " + storageNode);
@@ -67,7 +63,7 @@ public class StorageManager implements StorageManagerInterface {
             }
             logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} storageItemId -> {} is storageItem -> {}", graphNodeRef, storageId, storageItemId, storageItem);
             return storageItem;
-        } catch (Exception e ) {
+        } catch (Exception e) {
             throw new OperationIncompleteException(e.getMessage(), e);
         }
     }
@@ -84,7 +80,7 @@ public class StorageManager implements StorageManagerInterface {
                 storage.create(dataLookupIdentifierInterface, storageItem);
             }
             logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} dataLookupIdentifierInterface -> {} storageItem -> {} is complete", graphNodeRef, storageId, dataLookupIdentifierInterface, storageItem);
-        } catch (Exception e ) {
+        } catch (Exception e) {
             throw new OperationIncompleteException(e.getMessage(), e);
         }
     }
@@ -92,13 +88,13 @@ public class StorageManager implements StorageManagerInterface {
     private StorageInterface<DataValueInterface> searchNodeStorage(GraphNodeRef graphNodeRef, String storageId) throws OperationIncompleteException {
         StorageInterface<DataValueInterface> result;
 
-        if (! nodeGlobalRepository.isStorageWithId(graphNodeRef, storageId)) {
+        if (!fullProjectRepository.isNodeStorageDeclaration(graphNodeRef, storageId)) {
             String errMessage = "No such Node " + graphNodeRef.getNodeUUID() + " storage " + storageId + " defined in ConfigProject";
             logger.error(errMessage);
             throw new OperationIncompleteException(errMessage);
         }
 
-        if (! isNodeStorageExists(graphNodeRef, storageId)) {
+        if (!isNodeStorageExists(graphNodeRef, storageId)) {
             initializeNodeStorage(graphNodeRef, storageId);
         }
 
@@ -189,14 +185,14 @@ public class StorageManager implements StorageManagerInterface {
     private StorageInterface<DataValueInterface> searchGlobalStorage(@NotNull String storageId) throws OperationIncompleteException {
         StorageInterface<DataValueInterface> result;
 
-        if (! globalStorageMap.containsKey(storageId)) {
+        if (!globalStorageMap.containsKey(storageId)) {
             String errMessage = "No such Global storage " + storageId + " defined in ConfigProject";
             logger.error(errMessage);
             logger.error("{}", globalStorageMap);
             throw new OperationIncompleteException(errMessage);
         }
 
-        if (! isGlobalStorageExists(storageId)) {
+        if (!isGlobalStorageExists(storageId)) {
             initializeGlobalStorage(storageId);
         }
 

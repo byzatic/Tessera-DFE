@@ -1,151 +1,151 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project.dto;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.util.List;
 import java.util.Objects;
 
-import com.google.gson.annotations.SerializedName;
-
 public class ConfigNodeItem {
 
-	@SerializedName("name")
-	private String name;
+    @SerializedName("name")
+    private String name;
 
-	@SerializedName("downstream")
-	private List<ConfigNodeItem> downstream;
+    @SerializedName("downstream")
+    private List<ConfigNodeItem> downstream;
 
-	@SerializedName("description")
-	private String description;
+    @SerializedName("description")
+    private String description;
 
-	@SerializedName("id")
-	private String id;
-
-
-	public ConfigNodeItem() {
-	}
-
-	private ConfigNodeItem(Builder builder) {
-		name = builder.name;
-		downstream = builder.downstream;
-		description = builder.description;
-		id = builder.id;
-	}
-
-	public static Builder newBuilder() {
-		return new Builder();
-	}
-
-	public static Builder newBuilder(ConfigNodeItem copy) {
-		Builder builder = new Builder();
-		builder.name = copy.getName();
-		builder.downstream = copy.getDownstream();
-		builder.description = copy.getDescription();
-		builder.id = copy.getId();
-		return builder;
-	}
+    @SerializedName("id")
+    private String id;
 
 
-	public String getName(){
-		return name;
-	}
+    public ConfigNodeItem() {
+    }
 
-	public List<ConfigNodeItem> getDownstream(){
-		return downstream;
-	}
+    private ConfigNodeItem(Builder builder) {
+        name = builder.name;
+        downstream = builder.downstream;
+        description = builder.description;
+        id = builder.id;
+    }
 
-	public String getDescription(){
-		return description;
-	}
+    public static Builder newBuilder() {
+        return new Builder();
+    }
 
-	public String getId(){
-		return id;
-	}
+    public static Builder newBuilder(ConfigNodeItem copy) {
+        Builder builder = new Builder();
+        builder.name = copy.getName();
+        builder.downstream = copy.getDownstream();
+        builder.description = copy.getDescription();
+        builder.id = copy.getId();
+        return builder;
+    }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (o == null || getClass() != o.getClass()) return false;
-		ConfigNodeItem nodeItem = (ConfigNodeItem) o;
-		return Objects.equals(name, nodeItem.name) && Objects.equals(downstream, nodeItem.downstream) && Objects.equals(description, nodeItem.description) && Objects.equals(id, nodeItem.id);
-	}
 
-	@Override
-	public int hashCode() {
-		return Objects.hash(name, downstream, description, id);
-	}
+    public String getName() {
+        return name;
+    }
 
-	@Override
-	public String toString() {
-		return "ConfigNodeItem{" +
-				"name='" + name + '\'' +
-				", downstream=" + downstream +
-				", description='" + description + '\'' +
-				", id='" + id + '\'' +
-				'}';
-	}
+    public List<ConfigNodeItem> getDownstream() {
+        return downstream;
+    }
 
-	/**
-	 * {@code ConfigNodeItem} builder static inner class.
-	 */
-	public static final class Builder {
-		private String name;
-		private List<ConfigNodeItem> downstream;
-		private String description;
-		private String id;
+    public String getDescription() {
+        return description;
+    }
 
-		private Builder() {
-		}
+    public String getId() {
+        return id;
+    }
 
-		/**
-		 * Sets the {@code name} and returns a reference to this Builder so that the methods can be chained together.
-		 *
-		 * @param val the {@code name} to set
-		 * @return a reference to this Builder
-		 */
-		public Builder name(String val) {
-			name = val;
-			return this;
-		}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ConfigNodeItem nodeItem = (ConfigNodeItem) o;
+        return Objects.equals(name, nodeItem.name) && Objects.equals(downstream, nodeItem.downstream) && Objects.equals(description, nodeItem.description) && Objects.equals(id, nodeItem.id);
+    }
 
-		/**
-		 * Sets the {@code downstream} and returns a reference to this Builder so that the methods can be chained together.
-		 *
-		 * @param val the {@code downstream} to set
-		 * @return a reference to this Builder
-		 */
-		public Builder downstream(List<ConfigNodeItem> val) {
-			downstream = val;
-			return this;
-		}
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, downstream, description, id);
+    }
 
-		/**
-		 * Sets the {@code description} and returns a reference to this Builder so that the methods can be chained together.
-		 *
-		 * @param val the {@code description} to set
-		 * @return a reference to this Builder
-		 */
-		public Builder description(String val) {
-			description = val;
-			return this;
-		}
+    @Override
+    public String toString() {
+        return "ConfigNodeItem{" +
+                "name='" + name + '\'' +
+                ", downstream=" + downstream +
+                ", description='" + description + '\'' +
+                ", id='" + id + '\'' +
+                '}';
+    }
 
-		/**
-		 * Sets the {@code id} and returns a reference to this Builder so that the methods can be chained together.
-		 *
-		 * @param val the {@code id} to set
-		 * @return a reference to this Builder
-		 */
-		public Builder id(String val) {
-			id = val;
-			return this;
-		}
+    /**
+     * {@code ConfigNodeItem} builder static inner class.
+     */
+    public static final class Builder {
+        private String name;
+        private List<ConfigNodeItem> downstream;
+        private String description;
+        private String id;
 
-		/**
-		 * Returns a {@code ConfigNodeItem} built from the parameters previously set.
-		 *
-		 * @return a {@code ConfigNodeItem} built with parameters of this {@code ConfigNodeItem.Builder}
-		 */
-		public ConfigNodeItem build() {
-			return new ConfigNodeItem(this);
-		}
-	}
+        private Builder() {
+        }
+
+        /**
+         * Sets the {@code name} and returns a reference to this Builder so that the methods can be chained together.
+         *
+         * @param val the {@code name} to set
+         * @return a reference to this Builder
+         */
+        public Builder name(String val) {
+            name = val;
+            return this;
+        }
+
+        /**
+         * Sets the {@code downstream} and returns a reference to this Builder so that the methods can be chained together.
+         *
+         * @param val the {@code downstream} to set
+         * @return a reference to this Builder
+         */
+        public Builder downstream(List<ConfigNodeItem> val) {
+            downstream = val;
+            return this;
+        }
+
+        /**
+         * Sets the {@code description} and returns a reference to this Builder so that the methods can be chained together.
+         *
+         * @param val the {@code description} to set
+         * @return a reference to this Builder
+         */
+        public Builder description(String val) {
+            description = val;
+            return this;
+        }
+
+        /**
+         * Sets the {@code id} and returns a reference to this Builder so that the methods can be chained together.
+         *
+         * @param val the {@code id} to set
+         * @return a reference to this Builder
+         */
+        public Builder id(String val) {
+            id = val;
+            return this;
+        }
+
+        /**
+         * Returns a {@code ConfigNodeItem} built from the parameters previously set.
+         *
+         * @return a {@code ConfigNodeItem} built with parameters of this {@code ConfigNodeItem.Builder}
+         */
+        public ConfigNodeItem build() {
+            return new ConfigNodeItem(this);
+        }
+    }
 }

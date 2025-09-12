@@ -1,33 +1,33 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface;
 
+import io.github.byzatic.commons.ObjectsUtils;
+import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
+import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
+import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
+import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
+import io.github.byzatic.tessera.storageapi.dto.StorageItem;
+import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncompleteException;
+import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
 import org.apache.commons.math3.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.github.byzatic.commons.ObjectsUtils;
-import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
-import io.github.byzatic.tessera.storageapi.dto.StorageItem;
-import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
-import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
-import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
-import io.github.byzatic.tessera.engine.domain.repository.JpaLikeNodeRepositoryInterface;
-import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
-import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
-import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncompleteException;
 
 import java.util.ArrayList;
 import java.util.List;
 
 
 public class StorageApi implements StorageApiInterface {
-    private final static Logger logger= LoggerFactory.getLogger(io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.StorageApi.class);
+    private final static Logger logger = LoggerFactory.getLogger(io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.StorageApi.class);
     private final GraphNodeRef graphNodeRef;
-    private final JpaLikeNodeRepositoryInterface nodeRepository;
+    private final FullProjectRepository fullProjectRepository;
     private StorageManagerInterface storageManager = null;
 
-    public StorageApi(StorageManagerInterface storageManager, GraphNodeRef graphNodeRef, JpaLikeNodeRepositoryInterface nodeRepository) {
+    public StorageApi(StorageManagerInterface storageManager, GraphNodeRef graphNodeRef, FullProjectRepository fullProjectRepository) {
         this.storageManager = storageManager;
         this.graphNodeRef = graphNodeRef;
-        this.nodeRepository = nodeRepository;
+        this.fullProjectRepository = fullProjectRepository;
     }
 
     private GraphNodeRef getDownstreamGraphNodeRef(StorageItem storageItem) throws MCg3ApiOperationIncompleteException {
@@ -37,10 +37,10 @@ public class StorageApi implements StorageApiInterface {
             ObjectsUtils.requireNonNull(downstreamNodeId, new IllegalArgumentException("Downstream node name should be NotNull"));
             logger.debug("Searching downstream GraphNodeRef by node ID {}", downstreamNodeId);
             GraphNodeRef localRequestNode = null;
-            NodeItem nodeItem = nodeRepository.getNode(graphNodeRef);
+            NodeItem nodeItem = fullProjectRepository.getNode(graphNodeRef);
             List<GraphNodeRef> graphNodeRefList = nodeItem.getDownstream();
             for (GraphNodeRef downstreamGraphNodeRef : graphNodeRefList) {
-                NodeItem downstreamNodeItem = nodeRepository.getNode(downstreamGraphNodeRef);
+                NodeItem downstreamNodeItem = fullProjectRepository.getNode(downstreamGraphNodeRef);
                 logger.debug("Processing search {} for {} and {}", downstreamNodeId, downstreamGraphNodeRef, downstreamNodeItem);
                 if (downstreamNodeItem.getId().equals(downstreamNodeId)) {
                     localRequestNode = downstreamGraphNodeRef;
@@ -55,7 +55,7 @@ public class StorageApi implements StorageApiInterface {
                 }
             }
             logger.debug("Searching downstream GraphNodeRef by node ID {} complete; result is {}", downstreamNodeId, localRequestNode);
-            ObjectsUtils.requireNonNull(localRequestNode, new MCg3ApiOperationIncompleteException("Node with name "+storageItem.getDownstreamName()+" was not found"));
+            ObjectsUtils.requireNonNull(localRequestNode, new MCg3ApiOperationIncompleteException("Node with name " + storageItem.getDownstreamName() + " was not found"));
             return localRequestNode;
         } catch (Exception e) {
             throw new MCg3ApiOperationIncompleteException(e);

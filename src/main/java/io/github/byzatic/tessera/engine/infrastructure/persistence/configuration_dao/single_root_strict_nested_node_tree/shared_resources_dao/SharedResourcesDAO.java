@@ -1,14 +1,12 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.shared_resources_manager;
+package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.shared_resources_dao;
 
-import com.google.errorprone.annotations.ThreadSafe;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
-import io.github.byzatic.tessera.engine.domain.repository.SharedResourcesRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_loader.SharedResourcesDAOInterface;
 import io.github.byzatic.tessera.service.service.ServiceFactoryInterface;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineFactoryInterface;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URL;
@@ -16,31 +14,19 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
 
-@ThreadSafe
-public class SharedResourcesRepository implements SharedResourcesRepositoryInterface {
-    private final static Logger logger = LoggerFactory.getLogger(SharedResourcesRepository.class);
-    private final List<ClassLoader> urlClassLoaders = new ArrayList<>();
-
-    public SharedResourcesRepository(String projectName) throws OperationIncompleteException {
-        try {
-            loadSharedResources(projectName);
-        } catch (Exception e) {
-            throw new OperationIncompleteException(e);
-        }
-    }
+public class SharedResourcesDAO implements SharedResourcesDAOInterface {
+    private final static Logger logger = LoggerFactory.getLogger(SharedResourcesDAO.class);
 
     @Override
-    public synchronized @Nullable ClassLoader getSharedResourcesClassLoader() {
-        ClassLoader lastUrlClassLoader = null;
-        if (!urlClassLoaders.isEmpty()) {
-            lastUrlClassLoader = urlClassLoaders.get(urlClassLoaders.size() - 1);
-        }
-        return lastUrlClassLoader;
+    public List<ClassLoader> loadSharedResources(String projectName) {
+        List<ClassLoader> urlClassLoaders = new ArrayList<>();
+        load(projectName, urlClassLoaders);
+        return urlClassLoaders;
     }
 
-    private void loadSharedResources(String projectName) throws OperationIncompleteException {
+    public void load(String projectName, List<ClassLoader> urlClassLoaders) {
         try {
-            initPreloadedResources();
+            initPreloadedResources(urlClassLoaders);
 
             File dir = Configuration.PROJECTS_DIR.resolve(projectName).resolve("modules").resolve("shared").toFile();
 
@@ -51,7 +37,7 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
             if (jars != null) {
                 for (File jar : jars) {
                     logger.debug("Found jar: " + jar.getAbsolutePath());
-                    loadResource(jar);
+                    loadResource(jar, urlClassLoaders);
                     logger.debug("Loaded jar: " + jar.getAbsolutePath());
                 }
             } else {
@@ -59,11 +45,11 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
             }
 
         } catch (Exception e) {
-            throw new OperationIncompleteException(e);
+            throw new RuntimeException(e);
         }
     }
 
-    private void loadResource(File file) throws OperationIncompleteException {
+    private void loadResource(File file, List<ClassLoader> urlClassLoaders) throws OperationIncompleteException {
         try {
             ClassLoader lastClassLoader = null;
 
@@ -91,7 +77,7 @@ public class SharedResourcesRepository implements SharedResourcesRepositoryInter
         }
     }
 
-    private void initPreloadedResources() {
+    private void initPreloadedResources(List<ClassLoader> urlClassLoaders) {
         List<ClassLoader> classLoaders = new ArrayList<>();
         classLoaders.add(ServiceFactoryInterface.class.getClassLoader());
         classLoaders.add(WorkflowRoutineFactoryInterface.class.getClassLoader());

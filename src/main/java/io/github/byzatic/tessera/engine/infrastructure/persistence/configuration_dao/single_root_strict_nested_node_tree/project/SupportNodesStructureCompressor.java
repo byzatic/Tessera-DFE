@@ -1,12 +1,12 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project.dto.ConfigNodeItem;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project.dto.ConfigProject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -50,7 +50,7 @@ class SupportNodesStructureCompressor {
                 .setDownstream(nodeDownstreamMap.values().stream().toList())
                 .build();
 
-        if (graphNodeRef ==  null) {
+        if (graphNodeRef == null) {
             graphNodeRef = GraphNodeRef.newBuilder().nodeUUID(nodeUUUID).build();
         }
         nodes.put(graphNodeRef, node);

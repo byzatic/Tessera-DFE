@@ -1,4 +1,4 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.shared_resources_manager;
+package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.shared_resources_dao;
 
 import java.io.IOException;
 import java.net.URL;
@@ -20,7 +20,8 @@ class CompositeClassLoader extends ClassLoader {
         for (ClassLoader cl : delegates) {
             try {
                 return cl.loadClass(name);
-            } catch (ClassNotFoundException ignored) {}
+            } catch (ClassNotFoundException ignored) {
+            }
         }
         throw new ClassNotFoundException(name);
     }

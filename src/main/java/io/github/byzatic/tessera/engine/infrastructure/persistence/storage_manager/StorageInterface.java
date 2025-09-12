@@ -1,10 +1,10 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager;
 
-import org.apache.commons.math3.util.Pair;
-import org.jetbrains.annotations.NotNull;
-import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
+import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
+import org.apache.commons.math3.util.Pair;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -24,5 +24,6 @@ public interface StorageInterface<T extends DataValueInterface> {
     @NotNull Boolean contains(DataLookupIdentifierImpl id) throws OperationIncompleteException;
 
     @NotNull Integer size();
+
     void cleanup();
 }
