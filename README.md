@@ -11,8 +11,8 @@ Tessera Data Flow Engine is a modular execution system based on directed acyclic
 Рутины внутри одной стадии запускаются асинхронно и могут выполняться параллельно. Это обеспечивает эффективное использование ресурсов и ускоряет выполнение вычислений, особенно в случае сложных графов с большим количеством узлов и зависимостей.
 
 ## Документация
-- [Конфигурирование Tessera DFE](.docs%2Fengine%2F%D1%81onfiguration%2FRU_README_Tessera_Configuration.md)
-- [Общая структура проекта Tessera-DFE](.docs%2Fengine%2Fconfiguration%2FRU_README_Tessera_Configuration.md)
+- [Конфигурирование Tessera DFE](.docs%2Fengine%2Fconfiguration%2FRU_README_Tessera_Configuration.md)
+- [Общая структура проекта Tessera-DFE](.docs%2Fproject%2FRU_README_Main.md)(.docs%2Fengine%2Fconfiguration%2FRU_README_Tessera_Configuration.md)
 
 ## Конфигурирование (краткий мануал)
 Конфигурационный файл: `configuration.xml` по пути configurations/configuration.xml
