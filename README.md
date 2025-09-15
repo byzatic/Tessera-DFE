@@ -104,22 +104,26 @@ mvn -DskipITs=false verify
 **Запуск** \
 Проект настроен сразу на три способа доставки:
 
-1. Тонкий JAR + папка lib
+Создайте package
 ```shell
 mvn -U -B -DskipTests package
-java -jar target/tessera-dfe-0.1.2.jar
+```
+
+**ВАРИАНТ ЗАПУСКА 1** - Тонкий JAR + папка lib
+```shell
+java -Dconfig.file=configurations/configuration.xml -jar target/tessera-dfe-0.1.2.jar
 ```
 (манифест содержит Class-Path: lib/..., зависимости должны лежать в target/lib)
 
-2. Assembly Uber-JAR (jar-with-dependencies)
+**ВАРИАНТ ЗАПУСКА 2** - Assembly Uber-JAR (jar-with-dependencies)
 ```shell
-java -jar target/tessera-dfe-0.1.2-jar-with-dependencies.jar
+java -Dconfig.file=configurations/configuration.xml -jar target/tessera-dfe-0.1.2-jar-with-dependencies.jar
 ```
 
-3. Shaded Uber-JAR (прикреплённый артефакт)
+**ВАРИАНТ ЗАПУСКА 3** - Shaded Uber-JAR (прикреплённый артефакт)
 Имя обычно в стиле: tessera-dfe-0.1.2-shaded.jar
 ```shell
-java -jar target/tessera-dfe-0.1.2-shaded.jar
+java -Dconfig.file=configurations/configuration.xml -jar target/tessera-dfe-0.1.2-shaded.jar
 ```
 ---
 
