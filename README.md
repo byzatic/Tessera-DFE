@@ -256,9 +256,9 @@ docker run -d --name tessera-data-flow-engine \
 ## Вклад в проект
 1. Создайте Issue
 2. Сделайте форк репозитория
-3. Создайте ветку feature/feature-isuue-*
+3. Создайте ветку feature/feature-issue-*
 4. Отправьте Pull Request
-Подробности см. в CONTRIBUTING.md.
+Подробности см. в [CONTRIBUTING.md](CONTRIBUTING.md).
 
 # Лицензия
 
@@ -266,6 +266,6 @@ docker run -d --name tessera-data-flow-engine \
 
 # Контакты
 
-**Автор:** Имя Фамилия \
-**Email:** your@email  \
-**GitHub:** @username
+**Author:** Svyatoslav Vlasov \
+**Email:** s.vlaosv98@gmail.com  \
+**GitHub:** @byzatic
