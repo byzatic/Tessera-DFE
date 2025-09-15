@@ -25,31 +25,34 @@ Tessera Data Flow Engine is a modular execution system based on directed acyclic
 </Configuration>
 ```
 - graphCalculationCronCycle - интервал выполнения расчета графа
-```
-graphCalculationCronCycle syntax
-
-Format: 5 or 6 space-separated fields:
-  [seconds] minutes hours day-of-month month day-of-week
-If only 5 fields are provided, the seconds field defaults to 0.
-
-Supported tokens per field:
-  * (any), exact numbers (e.g., 5), ranges (a-b), lists (a,b,c),
-  steps (*/n), and stepped ranges (a-b/n).
-Names (JAN–DEC, SUN–SAT) and Quartz-specific tokens (?, L, W, #) are NOT supported.
-Day-of-Month AND Day-of-Week must both match (AND semantics).
-Day-of-Week uses 0–6, where 0 = Sunday.
-
-Examples:
-  */10 * * * * *    → every 10 seconds
-  0 */5 * * * *     → every 5 minutes (on second 0)
-  0 15 10 * * *     → 10:15:00 every day
-  0 0 12 * * 1-5    → 12:00:00 Monday–Friday (0=Sun…6=Sat)
-
-NOTE:
-  The Quartz-style value "*/10 * * * * ?" is NOT valid here (the "?" token isn’t supported).
-  Use the 6-field form "*/10 * * * * *" to run every 10 seconds.
-```
 - projectName - имя проекта (в данном случае MyAwesomeProject)
+
+Примечаение graphCalculationCronCycle
+```text
+graphCalculationCronCycle — cron schedule for graphManager.
+
+    Format: 5 or 6 space-separated fields:
+      [seconds] minutes hours day-of-month month day-of-week
+    If only 5 fields are provided, the seconds field defaults to 0.
+
+    Supported tokens per field:
+      * (any), exact numbers (e.g., 5), ranges (a-b), lists (a,b,c),
+      steps (*/n), and stepped ranges (a-b/n).
+    Names (JAN–DEC, SUN–SAT) and Quartz-specific tokens (?, L, W, #) are NOT supported.
+    Day-of-Month AND Day-of-Week must both match (AND semantics).
+    Day-of-Week uses 0–6, where 0 = Sunday.
+
+    Examples:
+      */10 * * * * *    → every 10 seconds
+      0 */5 * * * *     → every 5 minutes (on second 0)
+      0 15 10 * * *     → 10:15:00 every day
+      0 0 12 * * 1-5    → 12:00:00 Monday–Friday (0=Sun…6=Sat)
+
+    NOTE:
+      The Quartz-style value "*/10 * * * * ?" is NOT valid here (the "?" token isn’t supported).
+      Use the 6-field form "*/10 * * * * *" to run every 10 seconds.
+```
+
 > Закоментируйте `dataDirectory` для использования в Docker
 
 **(Без Docker)** Положите проект в data/projects/MyAwesomeProject \
