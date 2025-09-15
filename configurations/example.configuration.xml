@@ -27,6 +27,4 @@ graphCalculationCronCycle — cron schedule for graphManager.
     <initializeStorageByRequest>False</initializeStorageByRequest>
     <dataDirectory>/My/Awesome/Data/Directory</dataDirectory>
     <projectName>MyAwesomeProject</projectName>
-    <servicesPath>/My/Awesome/Services/Directory</servicesPath>
-    <workflowRoutinesPath>/My/Awesome/WorkflowRoutines/Directory</workflowRoutinesPath>
 </Configuration>

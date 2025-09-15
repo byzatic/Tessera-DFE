@@ -27,19 +27,12 @@ MyAwesomeProject/
   }
 }
 ```
-
-### Поля:
-
+Базовые поля проекта:
 - `project_config_version`: версия схемы описания проекта. В данном случае используется `v1.0.0-SingleRootStrictNestedNodeTree`, означающая наличие единственного корня и строгое иерархическое вложение узлов.
 - `project_name`: человекочитаемое имя проекта.
 - `structure`: структура графа.
 
----
-
-## Структура узлов
-
-Каждый узел определяется следующими полями:
-
+Поля узлов:
 - `id`: уникальный UUID узла.
 - `name`: имя экземпляра узла.
 - `description`: произвольное описание (опционально).
@@ -47,28 +40,54 @@ MyAwesomeProject/
 
 ---
 
-## Расшифровка текущей структуры примера
+## Именование нод
 
-```
-aggregation_main->bpm_test
-├── aggregation_hosts->group1
-│   └── host->10.174.18.251
-│       ├── hardware_abstract->filesystem
-│       │   └── hardware_abstract_unit->ro-root
-│       ├── hardware_abstract->ram
-│       │   └── hardware_abstract_unit->ram
-│       ├── hardware_abstract->swap
-│       │   └── hardware_abstract_unit->swap
-│       └── hardware_abstract->cpu
-│           └── hardware_abstract_unit->cpu
-└── external_mc_exporter->bpm_test
-```
+Каждый узел в `Project.json` имеет два важных атрибута:
 
-- `aggregation_main`, `aggregation_hosts`: агрегационные узлы.
-- `host`: узел, соответствующий физическому или виртуальному хосту.
-- `hardware_abstract`: абстрактный компонент (например, CPU, RAM).
-- `hardware_abstract_unit`: конкретная единица измерения компонента (например, `ro-root`, `ram`, `cpu`).
-- `external_mc_exporter`: внешний источник данных.
+- `id`: UUID узла, **уникальный** идентификатор. Так же можно вписать специальнуй переменную движка `#NAMED` которая установит в id значение поля `name`. При использовании `#NAMED` директории должны именоваться только по `name`.
+- `name`: строка в формате `<имя_экземпляра>`, например `hardware->ram`.
+
+Директория узла в `data/nodes/` должна называться строго по шаблону: `<id>-<name>` и `<name>` в случае использования `#NAMED`.
+
+Пример:
+Project.json в преокте
+```json
+{
+  "project_config_version": "v1.0.0-SingleRootStrictNestedNodeTree",
+  "project_name": "bpm_test_mcgen3",
+  "structure": {
+    "id": "23b51c9a-56ad-4e26-ae3d-b9f9856b2f67",
+    "name": "aggregation_main->bpm_test",
+    "description": "",
+    "downstream": [
+      {
+        "id": "cccccccc-677b-4090-b6d2-266452269568",
+        "name": "external_mc_exporter->selectel_1",
+        "description": "",
+        "downstream": []
+      },
+      {
+        "id": "#NAMED",
+        "name": "external_mc_exporter->sse",
+        "description": "",
+        "downstream": []
+      }
+    ]
+  }
+}
+```
+Директории нод: \
+Обычные
+```
+23b51c9a-56ad-4e26-ae3d-b9f9856b2f67-aggregation_main->bpm_test
+```
+```
+cccccccc-677b-4090-b6d2-266452269568-external_mc_exporter->selectel_1
+```
+и `#NAMED`
+```
+external_mc_exporter->sse
+```
 
 ---
 
@@ -85,7 +104,6 @@ aggregation_main->bpm_test
 ## Соглашения
 
 - Структура не содержит циклов.
-- Каждому узлу соответствует папка `data/nodes/<id>-<name>/`.
-- Названия узлов должны быть уникальны на уровне родителя.
+- Каждому узлу соответствует папка `data/nodes/<id>-<name>/` или `data/nodes/<name>/` в случае использования `#NAMED`.
 
 ---

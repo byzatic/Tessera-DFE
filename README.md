@@ -10,7 +10,57 @@ Tessera Data Flow Engine is a modular execution system based on directed acyclic
 
 Рутины внутри одной стадии запускаются асинхронно и могут выполняться параллельно. Это обеспечивает эффективное использование ресурсов и ускоряет выполнение вычислений, особенно в случае сложных графов с большим количеством узлов и зависимостей.
 
-## Установка
+## Документация
+- [Конфигурирование Tessera DFE](.docs%2Fengine%2F%D1%81onfiguration%2FRU_README_Tessera_Configuration.md)
+- [Общая структура проекта Tessera-DFE](.docs%2Fengine%2Fconfiguration%2FRU_README_Tessera_Configuration.md)
+
+## Конфигурирование (краткий мануал)
+Конфигурационный файл: `configuration.xml` по пути configurations/configuration.xml
+```xml
+<Configuration>
+    <graphCalculationCronCycle>*/10 * * * * *</graphCalculationCronCycle>
+    <initializeStorageByRequest>false</initializeStorageByRequest>
+    <!--<dataDirectory>/home/user/Tessera-DFE/data/projects/</dataDirectory>-->
+    <projectName>MyAwesomeProject</projectName>
+</Configuration>
+```
+- graphCalculationCronCycle - интервал выполнения расчета графа
+```
+graphCalculationCronCycle syntax
+
+Format: 5 or 6 space-separated fields:
+  [seconds] minutes hours day-of-month month day-of-week
+If only 5 fields are provided, the seconds field defaults to 0.
+
+Supported tokens per field:
+  * (any), exact numbers (e.g., 5), ranges (a-b), lists (a,b,c),
+  steps (*/n), and stepped ranges (a-b/n).
+Names (JAN–DEC, SUN–SAT) and Quartz-specific tokens (?, L, W, #) are NOT supported.
+Day-of-Month AND Day-of-Week must both match (AND semantics).
+Day-of-Week uses 0–6, where 0 = Sunday.
+
+Examples:
+  */10 * * * * *    → every 10 seconds
+  0 */5 * * * *     → every 5 minutes (on second 0)
+  0 15 10 * * *     → 10:15:00 every day
+  0 0 12 * * 1-5    → 12:00:00 Monday–Friday (0=Sun…6=Sat)
+
+NOTE:
+  The Quartz-style value "*/10 * * * * ?" is NOT valid here (the "?" token isn’t supported).
+  Use the 6-field form "*/10 * * * * *" to run every 10 seconds.
+```
+- projectName - имя проекта (в данном случае MyAwesomeProject)
+> Закоментируйте `dataDirectory` для использования в Docker
+
+**(Без Docker)** Положите проект в data/projects/MyAwesomeProject \
+**(C Docker)** Положите **zip** файл проекта например /home/user/Tessera-DFE/data/source/MyAwesomeProject.zip в /app/data/source_zip контейнера
+```yaml
+    # docker-compose 
+    volumes:
+      - /home/user/Tessera-DFE/data/source/:/app/data/source_zip
+```
+
+## Установка и Запуск
 
 ### Из исходников
 **Требования к окружению**
@@ -195,9 +245,6 @@ docker run -d --name tessera-data-flow-engine \
 - Убедитесь, что у Docker-демона есть лимиты памяти/CPU, достаточные для контейнера (по умолчанию — без жёстких лимитов).
 - Если диск медленный, логи лучше писать на отдельный том/диск (оставив маппинг ./logs).
 - Интервал DATA_DIR_WATCH_INTERVAL подберите под ваш режим загрузки (низкий — быстрее реагирует, но чаще читает FS).
-
-
-## Документация
 
 ## Требования
 **GAV:** io.github.byzatic.tessera:tessera-dfe:0.1.2 \
