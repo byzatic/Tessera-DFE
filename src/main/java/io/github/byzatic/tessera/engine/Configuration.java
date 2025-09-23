@@ -234,8 +234,7 @@ public class Configuration {
             result = configServicesPath;
             logger.debug("(config) PROJECT_SERVICES_PATH = {}", configServicesPath);
         } else {
-            if (!Files.exists(defaultServicesPath))
-                throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= " + defaultServicesPath);
+            // if (!Files.exists(defaultServicesPath)) throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= " + defaultServicesPath);
             result = defaultServicesPath;
             logger.debug("(default) PROJECT_SERVICES_PATH = {}", defaultServicesPath);
         }
@@ -259,8 +258,7 @@ public class Configuration {
             result = configWorkflowRoutinesPath;
             logger.debug("(config) PROJECT_WORKFLOW_ROUTINES_PATH = {}", configWorkflowRoutinesPath);
         } else {
-            if (!Files.exists(defaultWorkflowRoutinesPath))
-                throw new ConfigurationException("Default workflowRoutinesPath not exists.");
+            // if (!Files.exists(defaultWorkflowRoutinesPath)) throw new ConfigurationException("Default workflowRoutinesPath not exists.");
             result = defaultWorkflowRoutinesPath;
             logger.debug("(default) PROJECT_WORKFLOW_ROUTINES_PATH = {}", defaultWorkflowRoutinesPath);
         }
