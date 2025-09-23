@@ -22,9 +22,24 @@ graphCalculationCronCycle — cron schedule for graphManager.
       The Quartz-style value "*/10 * * * * ?" is NOT valid here (the "?" token isn’t supported).
       Use the 6-field form "*/10 * * * * *" to run every 10 seconds.
 -->
-<Configuration>
-    <graphCalculationCronCycle>*/10 * * * * *</graphCalculationCronCycle>
-    <initializeStorageByRequest>False</initializeStorageByRequest>
-    <dataDirectory>/My/Awesome/Data/Directory</dataDirectory>
-    <projectName>MyAwesomeProject</projectName>
-</Configuration>
+<tessera-dfe-configuration>
+    <engine>
+        <run>
+            <project name="MyAwesomeProject">
+                <CalculationCronCycle>*/10 * * * * *</CalculationCronCycle>
+                <storages>
+                    <initializeByRequest>false</initializeByRequest>
+                </storages>
+            </project>
+        </run>
+        <projects-data>
+            <archive-dir>
+                <path>/app/data/archive</path>
+            </archive-dir>
+            <runtime-dir>
+                <path>/app/data/runtime</path>
+                <rotation enabled="true" timestamp-pattern="yyyy-MM-dd'T'HHmmss" />
+            </runtime-dir>
+        </projects-data>
+    </engine>
+</tessera-dfe-configuration>

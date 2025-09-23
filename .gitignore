@@ -34,18 +34,24 @@ build/
 ### Mac OS ###
 .DS_Store
 
-### Locals for this configProject
+### Local for this Project
+
 # Игнорировать .develop
 .develop
+
 # Игнорировать всё в .logs
 logs/*
-# Игнорировать всё в data
-data/*
-# Не игнорировать саму папку data/configProject
-!data/configProject/
-# Игнорировать всё в data/configProject (внутри неё)
-data/configProject/*
+
+# Игнорировать всё в директориях данных
+projects_runtime_dir/*
+projects_archive_dir/*
+
+# Не игнорировать сами директории данных
+!projects_runtime_dir
+!projects_archive_dir
+
 # Игнорировать всё в configurations
 configurations/*
+
 # Не игнорировать example.configuration.xml в configurations
 !configurations/example.configuration.xml

@@ -2,6 +2,8 @@ package io.github.byzatic.tessera.engine;
 
 import io.github.byzatic.commons.TempDirectory;
 import io.github.byzatic.tessera.engine.application.commons.logging.MdcEngineContext;
+import io.github.byzatic.tessera.engine.infrastructure.config.reader.DfeConfigLoader;
+import io.github.byzatic.tessera.engine.infrastructure.config.reader.TesseraDfeConfig;
 import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
 import org.apache.commons.configuration2.XMLConfiguration;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
@@ -13,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 
 public class Configuration {
     private final static Logger logger = LoggerFactory.getLogger(Configuration.class);
@@ -25,6 +28,8 @@ public class Configuration {
     public static final TempDirectory TEMP_DIRECTORY = new TempDirectory(Configuration.APP_NAME, Boolean.TRUE);
 
     public static final Path CONFIGURATION_FILE_PATH;
+
+    public static final String PROJECT_NAME;
 
     // The cronExpressionString is a string that defines the schedule for periodic tasks using the cron format.
     // It supports five or six fields separated by spaces. If only five fields are provided, the seconds field
@@ -64,10 +69,8 @@ public class Configuration {
     //   - "* * * * * *"          runs every second.
     public static final String CRON_EXPRESSION_STRING;
     public static final Boolean INITIALIZE_STORAGE_BY_REQUEST;
-    public static final Path DATA_DIR;
-
+    public static final Path PROJECTS_ARCHIVE_DIR;
     public static final Path PROJECTS_DIR;
-    public static final String PROJECT_NAME;
     public static final Path PROJECT_SERVICES_PATH;
     public static final Path PROJECT_WORKFLOW_ROUTINES_PATH;
 
@@ -89,11 +92,14 @@ public class Configuration {
         return result;
     }
 
-    private static String initCronExpressionString(XMLConfiguration config) {
+    private static String initCronExpressionString(TesseraDfeConfig config) {
         String result;
 
         String propertyCronExpressionString = System.getProperty("graphCalculationCronCycle", null);
-        String configCronExpressionString = config.getString("graphCalculationCronCycle");
+        String configCronExpressionString = java.util.Optional.ofNullable(config)
+                .map(c -> c.project)
+                .map(p -> p.calculationCronCycle)
+                .orElse(null);
         String defaultCronExpressionString = "0 0/1 * * * *";
         if (propertyCronExpressionString != null) {
             result = propertyCronExpressionString;
@@ -108,10 +114,14 @@ public class Configuration {
         return result;
     }
 
-    private static Boolean initInitializeStorageByRequest(XMLConfiguration config) {
+    private static Boolean initInitializeStorageByRequest(TesseraDfeConfig config) {
         Boolean result;
         Boolean propertyInitializeStorageByRequest = (System.getProperty("initializeStorageByRequest", null) != null) ? Boolean.valueOf(System.getProperty("initializeStorageByRequest")) : null;
-        Boolean configInitializeStorageByRequest = (config.getString("initializeStorageByRequest") != null) ? Boolean.valueOf(config.getString("initializeStorageByRequest")) : null;
+        Boolean configInitializeStorageByRequest = java.util.Optional.ofNullable(config)
+                .map(c -> c.project)
+                .map(p -> p.storages)
+                .map(p -> p.initializeByRequest)
+                .orElse(null);
         Boolean defaultInitializeStorageByRequest = Boolean.FALSE;
         if (propertyInitializeStorageByRequest != null) {
             result = propertyInitializeStorageByRequest;
@@ -126,11 +136,16 @@ public class Configuration {
         return result;
     }
 
-    private static Path initDataDirectory(XMLConfiguration config) throws ConfigurationException {
+    private static Path initProjectsRuntimeDir(TesseraDfeConfig config) throws ConfigurationException {
         Path result;
-        Path propertyDataDirectory = (System.getProperty("dataDirectory", null) != null) ? Paths.get(System.getProperty("dataDirectory")) : null;
-        Path configDataDirectory = (config.getString("dataDirectory") != null) ? Paths.get(config.getString("dataDirectory")) : null;
-        Path defaultDataDirectory = Paths.get(Configuration.WORKING_DIR.resolve("data").toString());
+        Path propertyDataDirectory = (System.getProperty("projectsRuntimeDir", null) != null) ? Paths.get(System.getProperty("projectsRuntimeDir")) : null;
+        Path configDataDirectory = Optional.ofNullable(config)
+                .map(c -> c.projectsData)
+                .map(pd -> pd.runtimeDir)
+                .map(rd -> rd.path)
+                .map(Paths::get)
+                .orElse(null);
+        Path defaultDataDirectory = Configuration.WORKING_DIR.resolve("projects_runtime_dir");
 
         if (propertyDataDirectory != null) {
             if (!Files.exists(propertyDataDirectory))
@@ -150,11 +165,45 @@ public class Configuration {
         }
         return result;
     }
+    private static Path initProjectsArchiveDir(TesseraDfeConfig config) throws ConfigurationException {
+        Path result;
+        Path propertyDataDirectory = (System.getProperty("tessera.projects.archive.dir", null) != null) ? Paths.get(System.getProperty("tessera.projects.archive.dir")) : null;
+        Path configDataDirectory = Optional.ofNullable(config)
+                .map(c -> c.projectsData)
+                .map(pd -> pd.archiveDir)
+                .map(ad -> ad.path)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Paths::get)
+                .orElse(null);
+        Path defaultDataDirectory = Paths.get(Configuration.WORKING_DIR.resolve("projects_archive_dir").toString());
 
-    private static String initProjectName(XMLConfiguration config) throws ConfigurationException {
+        if (propertyDataDirectory != null) {
+            if (!Files.exists(propertyDataDirectory))
+                throw new ConfigurationException("Property tessera.projects.archive.dir not exists. dataDirectory= " + propertyDataDirectory);
+            result = propertyDataDirectory;
+            logger.debug("(property) DATA_DIR = {}", propertyDataDirectory);
+        } else if (configDataDirectory != null) {
+            if (!Files.exists(configDataDirectory))
+                throw new ConfigurationException("Config dataDirectory not exists. dataDirectory= " + configDataDirectory);
+            result = configDataDirectory;
+            logger.debug("(config) DATA_DIR = {}", configDataDirectory);
+        } else {
+            if (!Files.exists(defaultDataDirectory))
+                throw new ConfigurationException("Default dataDirectory not exists. dataDirectory= " + defaultDataDirectory);
+            result = defaultDataDirectory;
+            logger.debug("(default) DATA_DIR = {}", defaultDataDirectory);
+        }
+        return result;
+    }
+
+    private static String initProjectName(TesseraDfeConfig config) throws ConfigurationException {
         String result;
         String propertyProjectName = System.getProperty("projectName", null);
-        String configProjectName = config.getString("projectName");
+        String configProjectName = java.util.Optional.ofNullable(config)
+                .map(c -> c.project)
+                .map(p -> p.name)
+                .orElse(null);
 
         if (propertyProjectName != null) {
             result = propertyProjectName;
@@ -163,15 +212,15 @@ public class Configuration {
             result = configProjectName;
             logger.debug("(config) PROJECT_NAME = {}", configProjectName);
         } else {
-            throw new ConfigurationException("projectName is not set.");
+            throw new ConfigurationException("Project name was not set.");
         }
         return result;
     }
 
-    private static Path initProjectServicesPath(XMLConfiguration config) throws ConfigurationException {
+    private static Path initProjectServicesPath(TesseraDfeConfig config) throws ConfigurationException {
         Path result;
-        Path propertyServicesPath = (System.getProperty("servicesPath", null) != null) ? Paths.get(System.getProperty("servicesPath")) : null;
-        Path configServicesPath = (config.getString("servicesPath") != null) ? Paths.get(config.getString("servicesPath")) : null;
+        Path propertyServicesPath = null;
+        Path configServicesPath = null;
         Path defaultServicesPath = PROJECTS_DIR.resolve(PROJECT_NAME).resolve("modules").resolve("services");
 
         if (propertyServicesPath != null) {
@@ -185,18 +234,17 @@ public class Configuration {
             result = configServicesPath;
             logger.debug("(config) PROJECT_SERVICES_PATH = {}", configServicesPath);
         } else {
-            if (!Files.exists(defaultServicesPath))
-                throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= " + defaultServicesPath);
+            // if (!Files.exists(defaultServicesPath)) throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= " + defaultServicesPath);
             result = defaultServicesPath;
             logger.debug("(default) PROJECT_SERVICES_PATH = {}", defaultServicesPath);
         }
         return result;
     }
 
-    private static Path initWorkflowRoutinesPath(XMLConfiguration config) throws ConfigurationException {
+    private static Path initWorkflowRoutinesPath(TesseraDfeConfig config) throws ConfigurationException {
         Path result;
-        Path propertyWorkflowRoutinesPath = (System.getProperty("workflowRoutinesPath", null) != null) ? Paths.get(System.getProperty("workflowRoutinesPath")) : null;
-        Path configWorkflowRoutinesPath = (config.getString("workflowRoutinesPath") != null) ? Paths.get(config.getString("workflowRoutinesPath")) : null;
+        Path propertyWorkflowRoutinesPath = null;
+        Path configWorkflowRoutinesPath = null;
         Path defaultWorkflowRoutinesPath = PROJECTS_DIR.resolve(PROJECT_NAME).resolve("modules").resolve("workflow_routines");
 
         if (propertyWorkflowRoutinesPath != null) {
@@ -210,8 +258,7 @@ public class Configuration {
             result = configWorkflowRoutinesPath;
             logger.debug("(config) PROJECT_WORKFLOW_ROUTINES_PATH = {}", configWorkflowRoutinesPath);
         } else {
-            if (!Files.exists(defaultWorkflowRoutinesPath))
-                throw new ConfigurationException("Default workflowRoutinesPath not exists.");
+            // if (!Files.exists(defaultWorkflowRoutinesPath)) throw new ConfigurationException("Default workflowRoutinesPath not exists.");
             result = defaultWorkflowRoutinesPath;
             logger.debug("(default) PROJECT_WORKFLOW_ROUTINES_PATH = {}", defaultWorkflowRoutinesPath);
         }
@@ -250,11 +297,9 @@ public class Configuration {
         return version;
     }
 
-
     static {
         MdcContextInterface mdcEngineContext = MdcEngineContext.newBuilder().build();
         Logger logger = LoggerFactory.getLogger(Configuration.class);
-        Configurations configs = new Configurations();
         try (AutoCloseable ignored = mdcEngineContext.use()) {
             logger.debug("Configure instance.");
 
@@ -264,24 +309,21 @@ public class Configuration {
 
             CONFIGURATION_FILE_PATH = initConfigFilePath();
 
-            XMLConfiguration config = configs.xml(CONFIGURATION_FILE_PATH.toFile());
+            TesseraDfeConfig cfg = DfeConfigLoader.load(CONFIGURATION_FILE_PATH, Configuration.class.getResource("/schemas/tessera-dfe-configuration.xsd"));
 
-            CRON_EXPRESSION_STRING = initCronExpressionString(config);
+            PROJECT_NAME = initProjectName(cfg);
 
-            INITIALIZE_STORAGE_BY_REQUEST = initInitializeStorageByRequest(config);
+            CRON_EXPRESSION_STRING = initCronExpressionString(cfg);
 
-            logger.debug("(default only) WORKING_DIR = {}", WORKING_DIR);
+            INITIALIZE_STORAGE_BY_REQUEST = initInitializeStorageByRequest(cfg);
 
-            DATA_DIR = initDataDirectory(config);
+            PROJECTS_ARCHIVE_DIR = initProjectsArchiveDir(cfg);
 
-            PROJECTS_DIR = Configuration.DATA_DIR.resolve("projects");
-            logger.debug("(default only) PROJECTS_DIR = {}", PROJECTS_DIR);
+            PROJECTS_DIR = initProjectsRuntimeDir(cfg);
 
-            PROJECT_NAME = initProjectName(config);
+            PROJECT_SERVICES_PATH = initProjectServicesPath(cfg);
 
-            PROJECT_SERVICES_PATH = initProjectServicesPath(config);
-
-            PROJECT_WORKFLOW_ROUTINES_PATH = initWorkflowRoutinesPath(config);
+            PROJECT_WORKFLOW_ROUTINES_PATH = initWorkflowRoutinesPath(cfg);
 
             logger.debug("Configuration complete.");
         } catch (ConfigurationException ce) {

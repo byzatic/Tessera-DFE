@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+    <xs:element name="tessera-dfe-configuration" type="TesseraDfeConfiguration"/>
+
+    <xs:complexType name="TesseraDfeConfiguration">
+        <xs:sequence>
+            <xs:element name="engine" type="Engine"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="Engine">
+        <xs:sequence>
+            <xs:element name="run" type="Run"/>
+            <!-- projects-data МОЖЕТ отсутствовать -->
+            <xs:element name="projects-data" type="ProjectsData" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="Run">
+        <xs:sequence>
+            <!-- project МОЖЕТ отсутствовать -->
+            <xs:element name="project" type="Project" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="Project">
+        <xs:sequence>
+            <!-- ЕСЛИ project присутствует, CalculationCronCycle ОБЯЗАТЕЛЕН -->
+            <xs:element name="CalculationCronCycle" type="CronString"/>
+            <!-- storages МОЖЕТ отсутствовать -->
+            <xs:element name="storages" type="Storages" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="name" type="xs:string" use="optional"/>
+    </xs:complexType>
+
+    <xs:complexType name="Storages">
+        <xs:sequence>
+            <!-- initializeByRequest МОЖЕТ отсутствовать -->
+            <xs:element name="initializeByRequest" type="xs:boolean" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="ProjectsData">
+        <xs:sequence>
+            <!-- archive-dir МОЖЕТ отсутствовать, но если есть — ВНУТРИ ОБЯЗАТЕЛЕН path -->
+            <xs:element name="archive-dir" type="DirWithPath" minOccurs="0"/>
+            <!-- runtime-dir МОЖЕТ отсутствовать, но если есть — ВНУТРИ ОБЯЗАТЕЛЕН path; rotation МОЖЕТ отсутствовать -->
+            <xs:element name="runtime-dir" type="RuntimeDir" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="DirWithPath">
+        <xs:sequence>
+            <xs:element name="path" type="NonEmptyPath"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="RuntimeDir">
+        <xs:sequence>
+            <xs:element name="path" type="NonEmptyPath"/>
+            <xs:element name="rotation" type="Rotation" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="Rotation">
+        <!-- enabled делаем обязательным, timestamp-pattern — опционально -->
+        <xs:attribute name="enabled" type="xs:boolean" use="required"/>
+        <xs:attribute name="timestamp-pattern" type="xs:string" use="optional"/>
+    </xs:complexType>
+
+    <!-- Types -->
+    <xs:simpleType name="NonEmptyPath">
+        <xs:restriction base="xs:string">
+            <xs:minLength value="1"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Cron: точная семантика проверяется в коде; здесь только непустая строка -->
+    <xs:simpleType name="CronString">
+        <xs:restriction base="xs:string">
+            <xs:minLength value="1"/>
+        </xs:restriction>
+    </xs:simpleType>
+</xs:schema>

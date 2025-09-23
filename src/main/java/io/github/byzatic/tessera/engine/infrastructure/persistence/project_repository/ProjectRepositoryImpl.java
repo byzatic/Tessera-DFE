@@ -11,6 +11,7 @@ import io.github.byzatic.tessera.engine.domain.model.project.ProjectGlobal;
 import io.github.byzatic.tessera.engine.domain.repository.ProjectRepository;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.ProjectConfigReader;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.ZipArchiveImporter;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.GlobalContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.NodeContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.SharedResourcesContainer;
@@ -32,19 +33,25 @@ public class ProjectRepositoryImpl implements ProjectRepository {
     private SharedResourcesContainer sharedResourcesContainer = null;
     private NodeContainer nodeContainer = null;
     private GlobalContainer globalContainer = null;
+    private ZipArchiveImporter zipArchiveImporter = null;
 
     public ProjectRepositoryImpl(String projectName) {
         this(projectName, false);
     }
 
     public ProjectRepositoryImpl(String projectName, Boolean loadNow) {
-        this.projectName = projectName;
-        if (loadNow) {
-            try {
-                load();
-            } catch (OperationIncompleteException e) {
-                throw new RuntimeException(e);
+        try {
+            this.projectName = projectName;
+            this.zipArchiveImporter = new ZipArchiveImporter(Configuration.PROJECTS_DIR, ZipArchiveImporter.ConflictPolicy.DELETE, "yyyyMMdd-HHmmss");
+            if (loadNow) {
+                try {
+                    load();
+                } catch (OperationIncompleteException e) {
+                    throw new RuntimeException(e);
+                }
             }
+        } catch (OperationIncompleteException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -110,6 +117,8 @@ public class ProjectRepositoryImpl implements ProjectRepository {
     @Override
     public void load() throws OperationIncompleteException {
         try {
+            zipArchiveImporter.ingestSingle(Configuration.PROJECTS_ARCHIVE_DIR.resolve(projectName+".zip"));
+
             Map<String, ProjectLoaderTypes> projectLoaderTypesByProjectVersionMap = new HashMap<>();
             projectLoaderTypesByProjectVersionMap.put("v1.0.0-SingleRootStrictNestedNodeTree", ProjectLoaderTypes.PLV1);
 
