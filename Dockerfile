@@ -24,7 +24,7 @@ RUN mkdir -p /temp_1/logs
 
 
 # Step 2: Use a JRE image to run the application
-FROM --platform=linux/amd64 eclipse-temurin:17-jre-jammy
+FROM --platform=linux/amd64 docker.io/eclipse-temurin:17-jre-jammy
 
 # Install bash unzip no cashe
 RUN apt-get update && \
