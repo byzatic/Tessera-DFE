@@ -13,7 +13,8 @@ services:
     environment:
       - GRAPH_CALCULATION_CRON_CYCLE=*/10 * * * * *
       - PROMETHEUS_URI=http://0.0.0.0:9090/metrics
-      - JVM_METRICS_ENABLED=True
+      - JVM_METRICS_ENABLED=False
+      - PUBLISH_NODE_PIPELINE_EXECUTION_TIME=False
       - XMS=512m
       - XMX=6144m
       - DATA_DIR_WATCH_INTERVAL=5

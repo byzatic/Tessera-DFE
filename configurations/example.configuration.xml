@@ -29,4 +29,5 @@ graphCalculationCronCycle — cron schedule for graphManager.
     <projectName>MyAwesomeProject</projectName>
     <prometheusURI>http://0.0.0.0:9090/metrics</prometheusURI>
     <jvmMetricsEnabled>False</jvmMetricsEnabled>
+    <publishNodePipelineExecutionTime>False</publishNodePipelineExecutionTime>
 </Configuration>

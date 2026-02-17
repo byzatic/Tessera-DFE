@@ -1,15 +1,19 @@
 package io.github.byzatic.tessera.engine.infrastructure.observability;
 
+import io.github.byzatic.tessera.engine.Configuration;
 import io.prometheus.metrics.core.metrics.Gauge;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import io.prometheus.metrics.model.registry.PrometheusRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class PrometheusMetricsAgent {
+    private final static Logger logger = LoggerFactory.getLogger(PrometheusMetricsAgent.class);
 
     private static final PrometheusMetricsAgent INSTANCE = new PrometheusMetricsAgent();
 
@@ -20,7 +24,8 @@ public final class PrometheusMetricsAgent {
     private PrometheusRegistry registry;
     private HTTPServer server;
 
-    private Gauge graphExecutionSeconds;
+    private Gauge graphExecutionSeconds = null;
+    private Gauge nodePipelineExecutionSeconds = null;
 
     private PrometheusMetricsAgent() {
         // singleton
@@ -46,6 +51,14 @@ public final class PrometheusMetricsAgent {
                 .help("Graph execution duration in seconds")
                 .register(registry);
 
+        if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME) {
+            this.nodePipelineExecutionSeconds = Gauge.builder()
+                    .name("tessera_node_pipeline_execution_seconds")
+                    .help("Node pipeline execution duration in seconds")
+                    .labelNames("node_id", "node_name", "node_path")
+                    .register(registry);
+        }
+
         // Start HTTP endpoint
         this.server = HTTPServer.builder()
                 .registry(registry)
@@ -63,6 +76,21 @@ public final class PrometheusMetricsAgent {
         double seconds = durationMillis / 1000.0;
 
         graphExecutionSeconds.set(seconds);
+    }
+
+    /**
+     * Publish graph execution duration.
+     */
+    public void publishNodePipelineExecutionTime(long durationMillis, String nodeId, String nodeName, String nodePath) {
+        ensureStarted();
+        if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME) {
+
+            double seconds = durationMillis / 1000.0;
+
+            nodePipelineExecutionSeconds.labelValues(nodeId, nodeName, nodePath).set(seconds);
+        } else {
+            logger.debug("publishNodePipelineExecutionTime(...) called but PUBLISH_NODE_PIPELINE_EXECUTION_TIME is False");
+        }
     }
 
     /**
