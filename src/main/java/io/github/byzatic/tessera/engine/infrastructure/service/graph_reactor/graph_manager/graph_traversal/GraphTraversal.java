@@ -164,8 +164,11 @@ public class GraphTraversal implements GraphTraversalInterface {
     private void processWithPath(Node current, List<Node> path) throws OperationIncompleteException {
         try {
             throwIfCancelled();
-            logger.debug("Processing node: {}, path: {}", current,
-                    path.stream().map(Node::toString).collect(Collectors.joining(" -> ")));
+            logger.debug("Processing node: {}, path: {}", current.getGraphNodeRef().getNodeUUID(),
+                    path.stream()
+                            .map(Node::getGraphNodeRef)
+                            .map(GraphNodeRef::getNodeUUID)
+                            .collect(Collectors.joining(" -> ")));
             if (immediateScheduler != null) {
                 pipelineManagerFactory
                         .getNewPipelineManager(current.getGraphNodeRef(), convertPathToRefs(path), immediateScheduler, listeners)

@@ -6,6 +6,7 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.observability.PrometheusMetricsAgent;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversal;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.GraphTraversalInterface;
@@ -162,6 +163,8 @@ public class GraphManager implements GraphManagerInterface {
             scheduler.addListener(stageListener);
 
             try {
+                long start = System.currentTimeMillis();
+
                 // 3) Для каждого корневого узла — отдельная задача ImmediateScheduler,
                 //    внутри которой выполняется прежний traversal.traverse(rootNode).
                 for (GraphNodeRef ref : rootRefs) {
@@ -191,6 +194,10 @@ public class GraphManager implements GraphManagerInterface {
                         throw new OperationIncompleteException(err);
                     }
                 }
+
+                long dur = System.currentTimeMillis() - start;
+                PrometheusMetricsAgent.getInstance()
+                        .publishGraphExecutionTime(dur);
 
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();

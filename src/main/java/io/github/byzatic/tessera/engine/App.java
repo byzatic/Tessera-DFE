@@ -7,13 +7,12 @@ import io.github.byzatic.tessera.engine.infrastructure.config.ApplicationMainCon
 
 public class App {
     private final static Logger logger= LoggerFactory.getLogger(App.class);
-    private final static ProjectOrchestrator projectOrchestrator = new ProjectOrchestrator(ApplicationMainContext.getDomainLogic());
 
     public static void main( String[] args ) {
         try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
             logger.debug("Run application {} version {}", Configuration.APP_NAME, Configuration.APP_VERSION);
 
-            projectOrchestrator.orchestrateProject();
+            new ProjectOrchestrator(ApplicationMainContext.getDomainLogic()).orchestrateProject();
 
         } catch (Exception e) {
             throw new RuntimeException(e);

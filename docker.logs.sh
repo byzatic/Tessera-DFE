@@ -25,4 +25,4 @@ for arg in "$@"; do
 done
 
 # Вывод логов
-docker-compose -f "$COMPOSE_FILE" logs -f --tail=100 "${FILTERED_ARGS[@]}"
+docker-compose -f "$COMPOSE_FILE" logs -f -n 0 --tail=100 "${FILTERED_ARGS[@]}"

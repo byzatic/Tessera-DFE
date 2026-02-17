@@ -26,6 +26,8 @@ JAVA_OPTS=(
   -DgraphCalculationCronCycle="${GRAPH_CALCULATION_CRON_CYCLE:-'*/10 * * * * *'}"
   # TODO: ${INITIALIZE_STORAGE_BY_REQUEST:-'false'} default value is incorrect by quoting
   -DinitializeStorageByRequest="${INITIALIZE_STORAGE_BY_REQUEST:-'false'}"
+  -DprometheusURI="${PROMETHEUS_URI:-'http://0.0.0.0:9090/metrics'}"
+  -DjvmMetricsEnabled="${JVM_METRICS_ENABLED:-'False'}"
   # TODO: There is no -DsharedPath arg and EmptyValueDefaults check in engine
   #-DprojectName="${DATA_DIRECTORY:-'SomeTestProject'}"
   #-DservicesPath="${DATA_DIRECTORY:-'/app/data/services'}"

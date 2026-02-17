@@ -76,6 +76,30 @@
       <version>3.6.1</version>
     </dependency>
 
+    <!-- Source: https://mvnrepository.com/artifact/io.prometheus/prometheus-metrics-core -->
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-core</artifactId>
+      <version>1.5.0</version>
+      <scope>compile</scope>
+    </dependency>
+
+    <!-- Source: https://mvnrepository.com/artifact/io.prometheus/prometheus-metrics-exporter-httpserver -->
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-exporter-httpserver</artifactId>
+      <version>1.5.0</version>
+      <scope>compile</scope>
+    </dependency>
+
+    <!-- Source: https://mvnrepository.com/artifact/io.prometheus/prometheus-metrics-instrumentation-jvm -->
+    <dependency>
+      <groupId>io.prometheus</groupId>
+      <artifactId>prometheus-metrics-instrumentation-jvm</artifactId>
+      <version>1.5.0</version>
+      <scope>compile</scope>
+    </dependency>
+
     <dependency>
       <groupId>com.github.zafarkhaja</groupId>
       <artifactId>java-semver</artifactId>

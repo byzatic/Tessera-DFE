@@ -8,15 +8,21 @@ services:
     container_name: tessera-data-flow-engine
     ports:
       - "8080:8080"
+      - "9090:9090"
     volumes:
       - $PWD/configurations/:/app/configurations/
       - $PWD/data/source/:/app/data/source_zip
       - $PWD/logs/:/app/logs/
+      - $PWD/flight_recording/:/tmp/flight_recording/
     environment:
-      - GRAPH_CALCULATION_CRON_CYCLE=*/10 * * * * *
-      - XMS=20m
-      - XMX=8192m
-      - DATA_DIR_WATCH_INTERVAL=5
+      - GRAPH_CALCULATION_CRON_CYCLE=0 */5 * * * *
+      - PROMETHEUS_URI=http://0.0.0.0:9090/metrics
+      - JVM_METRICS_ENABLED=True
+      - XMS=512m
+      - XMX=6144m
+      #- JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,dumponexit=true,maxsize=512m,maxage=1h,delay=348s
+      - JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,duration=300s,delay=400s
+      - DATA_DIR_WATCH_INTERVAL=500
     logging:
       driver: json-file
       options:

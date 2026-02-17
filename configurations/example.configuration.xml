@@ -27,4 +27,6 @@ graphCalculationCronCycle — cron schedule for graphManager.
     <initializeStorageByRequest>False</initializeStorageByRequest>
     <dataDirectory>/My/Awesome/Data/Directory</dataDirectory>
     <projectName>MyAwesomeProject</projectName>
+    <prometheusURI>http://0.0.0.0:9090/metrics</prometheusURI>
+    <jvmMetricsEnabled>False</jvmMetricsEnabled>
 </Configuration>
