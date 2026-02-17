@@ -4,12 +4,12 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageInterface;
 import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
-import org.apache.commons.math3.util.Pair;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,26 +18,27 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Storage<T extends DataValueInterface> implements StorageInterface<T> {
     private final static Logger logger = LoggerFactory.getLogger(Storage.class);
-    private String storageId = null;
-    private Map<String, T> storage = new ConcurrentHashMap<>();
+    private final String storageId;
+    private final Map<String, T> storage;
 
     public Storage(@NotNull String storageId) throws OperationIncompleteException {
         this.storageId = storageId;
+        this.storage = new ConcurrentHashMap<>();
     }
 
     public Storage(@NotNull String storageId, @NotNull Map<String, T> storageMap) throws OperationIncompleteException {
         this.storageId = storageId;
-        this.storage = storageMap;
+        this.storage = new ConcurrentHashMap<>(storageMap);
     }
 
     public Storage(@NotNull Storage<T> storage) throws OperationIncompleteException {
         this.storageId = storage.storageId;
-        this.storage = storage.storage;
+        this.storage = new ConcurrentHashMap<>(storage.storage);
     }
 
     public Storage(@NotNull String storageId, @NotNull Storage<T> storage) throws OperationIncompleteException {
         this.storageId = storageId;
-        this.storage = storage.storage;
+        this.storage = new ConcurrentHashMap<>(storage.storage);
     }
 
     @Contract("null -> fail")
@@ -58,26 +59,26 @@ public class Storage<T extends DataValueInterface> implements StorageInterface<T
     @Override
     public void create(@NotNull DataLookupIdentifierImpl storageItemIdI, @NotNull T item) throws OperationIncompleteException {
         String id = getId(storageItemIdI);
-        if (storage.containsKey(id)) {
+        T previous = storage.putIfAbsent(id, item);
+        if (previous != null) {
             throw new OperationIncompleteException("Item with ID already exists: " + id);
         }
-        storage.put(id, item);
     }
 
     @Override
     public @NotNull T read(@NotNull DataLookupIdentifierImpl storageItemIdI) throws OperationIncompleteException {
         String id = getId(storageItemIdI);
-        return storage.get(id);
+        T item = storage.get(id);
+        if (item == null) {
+            throw new OperationIncompleteException("Item with ID " + id + " not found in storage " + storageId);
+        }
+        return item;
     }
 
     @Override
     public @NotNull Boolean update(@NotNull DataLookupIdentifierImpl storageItemIdI, @NotNull T item) throws OperationIncompleteException {
         String id = getId(storageItemIdI);
-        if (storage.containsKey(id)) {
-            storage.put(id, item);
-            return true;
-        }
-        return false;
+        return storage.replace(id, item) != null;
     }
 
     @Override
@@ -87,10 +88,10 @@ public class Storage<T extends DataValueInterface> implements StorageInterface<T
     }
 
     @Override
-    public @NotNull List<Pair<String, T>> list() throws OperationIncompleteException {
-        List<Pair<String, T>> storedPairs = new ArrayList<>();
-        for (Map.Entry<String, T> set : storage.entrySet()) {
-            storedPairs.add(new Pair<>(set.getKey(), set.getValue()));
+    public @NotNull List<Map.Entry<String, T>> list() throws OperationIncompleteException {
+        List<Map.Entry<String, T>> storedPairs = new ArrayList<>(storage.size());
+        for (Map.Entry<String, T> entry : storage.entrySet()) {
+            storedPairs.add(new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue()));
         }
         return storedPairs;
     }

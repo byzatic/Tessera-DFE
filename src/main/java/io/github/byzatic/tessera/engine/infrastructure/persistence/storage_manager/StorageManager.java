@@ -9,7 +9,6 @@ import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.storage.Storage;
 import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
-import org.apache.commons.math3.util.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,20 +27,39 @@ public class StorageManager implements StorageManagerInterface {
     public StorageManager(@NotNull FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
         this.fullProjectRepository = fullProjectRepository;
         if (!Configuration.INITIALIZE_STORAGE_BY_REQUEST) {
+            // Eager initialization: pre-create all declared storages
             for (StoragesItem storageGlobal : fullProjectRepository.getGlobal().getStorages()) {
                 if (storageGlobal.getIdName() == null || Objects.equals(storageGlobal.getIdName(), "")) {
                     throw new OperationIncompleteException("Global storage should have name -> " + storageGlobal);
                 }
                 String storageId = storageGlobal.getIdName();
-                initializeGlobalStorage(storageId);
+                globalStorageMap.computeIfAbsent(storageId, k -> {
+                    try {
+                        logger.debug("Global storage {} created", storageId);
+                        return new Storage<>(storageId);
+                    } catch (OperationIncompleteException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
             }
             for (GraphNodeRef graphNodeRef : fullProjectRepository.listGraphNodeRef()) {
+                // Get or create the node map atomically
+                Map<String, StorageInterface<DataValueInterface>> nodeMap = nodeStorageMap.computeIfAbsent(
+                        graphNodeRef, k -> new ConcurrentHashMap<>());
+
                 for (io.github.byzatic.tessera.engine.domain.model.node_global.StoragesItem storageNode : fullProjectRepository.getNodeGlobal(graphNodeRef).getStorages()) {
                     String storageName = storageNode.getIdName();
                     if (storageName == null || Objects.equals(storageName, "")) {
                         throw new OperationIncompleteException("Node storage should have name -> " + storageNode);
                     }
-                    initializeNodeStorage(graphNodeRef, storageName);
+                    nodeMap.computeIfAbsent(storageName, k -> {
+                        try {
+                            logger.debug("Node {} storage {} created", graphNodeRef.getNodeUUID(), storageName);
+                            return new Storage<>(storageName);
+                        } catch (OperationIncompleteException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
                 }
             }
         }
@@ -51,18 +69,13 @@ public class StorageManager implements StorageManagerInterface {
     @Override
     public DataValueInterface getItemFromStorage(@NotNull GraphNodeRef graphNodeRef, @NotNull String storageId, @NotNull DataLookupIdentifierImpl storageItemId) throws OperationIncompleteException {
         logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} storageItemId -> {}", graphNodeRef, storageId, storageItemId);
-        DataValueInterface storageItem = null;
         try {
             StorageInterface<DataValueInterface> storage = searchNodeStorage(graphNodeRef, storageId);
-            if (storage.contains(storageItemId)) {
-                storageItem = storage.read(storageItemId);
-            } else {
-                String errMessage = "Item with ID " + storageItemId + " was not found in storage " + storage.getStorageId();
-                logger.error(errMessage);
-                throw new OperationIncompleteException(errMessage);
-            }
+            DataValueInterface storageItem = storage.read(storageItemId);
             logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} storageItemId -> {} is storageItem -> {}", graphNodeRef, storageId, storageItemId, storageItem);
             return storageItem;
+        } catch (OperationIncompleteException e) {
+            throw e;
         } catch (Exception e) {
             throw new OperationIncompleteException(e.getMessage(), e);
         }
@@ -71,82 +84,59 @@ public class StorageManager implements StorageManagerInterface {
     @Override
     public void putItemToStorage(@NotNull GraphNodeRef graphNodeRef, @NotNull String storageId, @NotNull DataLookupIdentifierImpl dataLookupIdentifierInterface, @NotNull DataValueInterface storageItem) throws OperationIncompleteException {
         try {
-            logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} dataLookupIdentifierInterface -> {} storageItem -> {}", graphNodeRef, storageId, dataLookupIdentifierInterface, storageItem);
+            logger.debug("putItemToStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} dataLookupIdentifierInterface -> {}", graphNodeRef, storageId, dataLookupIdentifierInterface);
             StorageInterface<DataValueInterface> storage = searchNodeStorage(graphNodeRef, storageId);
-            if (storage.contains(dataLookupIdentifierInterface)) {
-                storage.delete(dataLookupIdentifierInterface);
-                storage.create(dataLookupIdentifierInterface, storageItem);
-            } else {
+            // Use update (upsert) instead of delete+create to reduce operations
+            boolean updated = storage.update(dataLookupIdentifierInterface, storageItem);
+            if (!updated) {
+                // Item didn't exist, create it
                 storage.create(dataLookupIdentifierInterface, storageItem);
             }
-            logger.debug("getItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} dataLookupIdentifierInterface -> {} storageItem -> {} is complete", graphNodeRef, storageId, dataLookupIdentifierInterface, storageItem);
+            logger.debug("putItemToStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} dataLookupIdentifierInterface -> {} is complete", graphNodeRef, storageId, dataLookupIdentifierInterface);
         } catch (Exception e) {
             throw new OperationIncompleteException(e.getMessage(), e);
         }
     }
 
     private StorageInterface<DataValueInterface> searchNodeStorage(GraphNodeRef graphNodeRef, String storageId) throws OperationIncompleteException {
-        StorageInterface<DataValueInterface> result;
-
         if (!fullProjectRepository.isNodeStorageDeclaration(graphNodeRef, storageId)) {
             String errMessage = "No such Node " + graphNodeRef.getNodeUUID() + " storage " + storageId + " defined in ConfigProject";
             logger.error(errMessage);
             throw new OperationIncompleteException(errMessage);
         }
 
-        if (!isNodeStorageExists(graphNodeRef, storageId)) {
-            initializeNodeStorage(graphNodeRef, storageId);
-        }
+        // Use computeIfAbsent for atomic initialization of the node storage map
+        Map<String, StorageInterface<DataValueInterface>> nodeMap = nodeStorageMap.computeIfAbsent(graphNodeRef,
+                k -> new ConcurrentHashMap<>());
 
-        result = nodeStorageMap.get(graphNodeRef).get(storageId);
-
-        return result;
-    }
-
-    private void initializeNodeStorage(GraphNodeRef graphNodeRef, String storageId) throws OperationIncompleteException {
-        StorageInterface<DataValueInterface> storage = new Storage<>(storageId);
-        if (nodeStorageMap.containsKey(graphNodeRef)) {
-            Map<String, StorageInterface<DataValueInterface>> existedNodeMap = nodeStorageMap.get(graphNodeRef);
-            existedNodeMap.put(storageId, storage);
-        } else {
-            Map<String, StorageInterface<DataValueInterface>> newNodeMap = new ConcurrentHashMap<>();
-            newNodeMap.put(storageId, storage);
-            nodeStorageMap.put(graphNodeRef, newNodeMap);
-        }
-        logger.debug("Node {} storage {} created", graphNodeRef.getNodeUUID(), storageId);
-    }
-
-    private Boolean isNodeStorageExists(GraphNodeRef graphNodeRef, String storageId) {
-        Boolean result = Boolean.FALSE;
-        if (nodeStorageMap.containsKey(graphNodeRef)) {
-            if (nodeStorageMap.get(graphNodeRef).containsKey(storageId)) {
-                result = Boolean.TRUE;
+        // Use computeIfAbsent for atomic initialization of the specific storage
+        return nodeMap.computeIfAbsent(storageId, k -> {
+            try {
+                logger.debug("Node {} storage {} created", graphNodeRef.getNodeUUID(), storageId);
+                return new Storage<>(storageId);
+            } catch (OperationIncompleteException e) {
+                throw new RuntimeException(e);
             }
-        }
-        logger.debug("Is jpa_like_node_repository {} storage {} exists: {}", graphNodeRef, storageId, result);
-        return result;
+        });
     }
+
+    // Note: initializeNodeStorage and isNodeStorageExists removed - now handled atomically by computeIfAbsent in searchNodeStorage
 
     @NotNull
     @Override
     public Boolean isDataExists(@NotNull GraphNodeRef graphNodeRef, @NotNull String storageId, @NotNull DataLookupIdentifierImpl storageItemId) throws OperationIncompleteException {
         logger.debug("isDataExists (NODE STORAGE) graphNodeRef -> {} storageId -> {} storageItemId -> {}", graphNodeRef, storageId, storageItemId);
         StorageInterface<DataValueInterface> storage = searchNodeStorage(graphNodeRef, storageId);
-        Boolean result = null;
-        if (storage.contains(storageItemId)) {
-            result = Boolean.TRUE;
-        } else {
-            result = Boolean.FALSE;
-        }
+        Boolean result = storage.contains(storageItemId);
         logger.debug("isDataExists (NODE STORAGE) graphNodeRef -> {} storageId -> {} storageItemId -> {} is {}", graphNodeRef, storageId, storageItemId, result);
         return result;
     }
 
     @Override
-    public @NotNull List<Pair<String, DataValueInterface>> listItemFromStorage(@NotNull GraphNodeRef graphNodeRef, @NotNull String storageId) throws OperationIncompleteException {
+    public @NotNull List<Map.Entry<String, DataValueInterface>> listItemFromStorage(@NotNull GraphNodeRef graphNodeRef, @NotNull String storageId) throws OperationIncompleteException {
         logger.debug("listItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {}", graphNodeRef, storageId);
         StorageInterface<DataValueInterface> storage = searchNodeStorage(graphNodeRef, storageId);
-        List<Pair<String, DataValueInterface>> result = storage.list();
+        List<Map.Entry<String, DataValueInterface>> result = storage.list();
         logger.debug("listItemFromStorage (NODE STORAGE) graphNodeRef -> {} storageId -> {} is {}", graphNodeRef, storageId, result);
         return result;
     }
@@ -155,65 +145,52 @@ public class StorageManager implements StorageManagerInterface {
     @Override
     public DataValueInterface getItemFromStorage(@NotNull String storageId, @NotNull DataLookupIdentifierImpl storageItemId) throws OperationIncompleteException {
         logger.debug("getItemFromStorage (GLOBAL STORAGE) storageId -> {} storageItemId -> {}", storageId, storageItemId);
-        DataValueInterface storageItem = null;
-
         StorageInterface<DataValueInterface> storage = searchGlobalStorage(storageId);
-        if (storage.contains(storageItemId)) {
-            storageItem = storage.read(storageItemId);
-        } else {
-            String errMessage = "Item with ID " + storageItemId + " was not found in storage " + storage.getStorageId();
-            logger.error(errMessage);
-            throw new OperationIncompleteException(errMessage);
-        }
+        DataValueInterface storageItem = storage.read(storageItemId);
         logger.debug("getItemFromStorage (GLOBAL STORAGE) storageId -> {} storageItemId -> {} is storageItem -> {}", storageId, storageItemId, storageItem);
         return storageItem;
     }
 
     @Override
     public void putItemToStorage(@NotNull String storageId, @NotNull DataLookupIdentifierImpl storageItemId, @NotNull DataValueInterface storageItem) throws OperationIncompleteException {
-        logger.debug("putItemToStorage (GLOBAL STORAGE) storageId -> {} storageItemId -> {} storageItem -> {}", storageId, storageItemId, storageItem);
+        logger.debug("putItemToStorage (GLOBAL STORAGE) storageId -> {} storageItemId -> {}", storageId, storageItemId);
         StorageInterface<DataValueInterface> storage = searchGlobalStorage(storageId);
-        if (storage.contains(storageItemId)) {
-            storage.delete(storageItemId);
-            storage.create(storageItemId, storageItem);
-        } else {
+        // Use update (upsert) instead of delete+create to reduce operations
+        boolean updated = storage.update(storageItemId, storageItem);
+        if (!updated) {
+            // Item didn't exist, create it
             storage.create(storageItemId, storageItem);
         }
-        logger.debug("putItemToStorage (GLOBAL STORAGE) storageId -> {} storageItemId -> {} storageItem -> {} is complete", storageId, storageItemId, storageItem);
+        logger.debug("putItemToStorage (GLOBAL STORAGE) storageId -> {} storageItemId -> {} is complete", storageId, storageItemId);
     }
 
     private StorageInterface<DataValueInterface> searchGlobalStorage(@NotNull String storageId) throws OperationIncompleteException {
-        StorageInterface<DataValueInterface> result;
-
-        if (!globalStorageMap.containsKey(storageId)) {
-            String errMessage = "No such Global storage " + storageId + " defined in ConfigProject";
-            logger.error(errMessage);
-            logger.error("{}", globalStorageMap);
-            throw new OperationIncompleteException(errMessage);
+        // When INITIALIZE_STORAGE_BY_REQUEST is false, we validate against the project repository
+        // but still use lazy initialization via computeIfAbsent
+        if (!Configuration.INITIALIZE_STORAGE_BY_REQUEST) {
+            boolean storageDeclared = false;
+            for (StoragesItem storageGlobal : fullProjectRepository.getGlobal().getStorages()) {
+                if (storageId.equals(storageGlobal.getIdName())) {
+                    storageDeclared = true;
+                    break;
+                }
+            }
+            if (!storageDeclared) {
+                String errMessage = "No such Global storage " + storageId + " defined in ConfigProject";
+                logger.error(errMessage);
+                throw new OperationIncompleteException(errMessage);
+            }
         }
 
-        if (!isGlobalStorageExists(storageId)) {
-            initializeGlobalStorage(storageId);
-        }
-
-        result = globalStorageMap.get(storageId);
-
-        return result;
-    }
-
-    private void initializeGlobalStorage(String storageId) throws OperationIncompleteException {
-        StorageInterface<DataValueInterface> storage = new Storage<>(storageId);
-        globalStorageMap.put(storageId, storage);
-        logger.debug("Global storage {} created", storageId);
-    }
-
-    private Boolean isGlobalStorageExists(String storageId) {
-        Boolean result = Boolean.FALSE;
-        if (globalStorageMap.containsKey(storageId)) {
-            result = Boolean.TRUE;
-        }
-        logger.debug("Is dto storage {} exists: {}", storageId, result);
-        return result;
+        // Use computeIfAbsent for atomic lazy initialization
+        return globalStorageMap.computeIfAbsent(storageId, k -> {
+            try {
+                logger.debug("Global storage {} created", storageId);
+                return new Storage<>(storageId);
+            } catch (OperationIncompleteException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     @NotNull
@@ -221,21 +198,16 @@ public class StorageManager implements StorageManagerInterface {
     public Boolean isDataExists(@NotNull String storageId, @NotNull DataLookupIdentifierImpl storageItemId) throws OperationIncompleteException {
         logger.debug("isDataExists (GLOBAL STORAGE) storageId -> {} storageItemId -> {}", storageId, storageItemId);
         StorageInterface<DataValueInterface> storage = searchGlobalStorage(storageId);
-        Boolean result = null;
-        if (storage.contains(storageItemId)) {
-            result = Boolean.TRUE;
-        } else {
-            result = Boolean.FALSE;
-        }
+        Boolean result = storage.contains(storageItemId);
         logger.debug("isDataExists (GLOBAL STORAGE) storageId -> {} storageItemId -> {} is {}", storageId, storageItemId, result);
         return result;
     }
 
     @Override
-    public @NotNull List<Pair<String, DataValueInterface>> listItemFromStorage(@NotNull String storageId) throws OperationIncompleteException {
+    public @NotNull List<Map.Entry<String, DataValueInterface>> listItemFromStorage(@NotNull String storageId) throws OperationIncompleteException {
         logger.debug("listItemFromStorage (GLOBAL STORAGE) storageId -> {}", storageId);
         StorageInterface<DataValueInterface> storage = searchGlobalStorage(storageId);
-        List<Pair<String, DataValueInterface>> result = storage.list();
+        List<Map.Entry<String, DataValueInterface>> result = storage.list();
         logger.debug("listItemFromStorage (GLOBAL STORAGE) storageId -> {} is {}", storageId, result);
         return result;
     }
