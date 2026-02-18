@@ -5,14 +5,18 @@ services:
     container_name: tessera-data-flow-engine
     ports:
       - "8080:8080"
+      - "9090:9090"
     volumes:
       - $PWD/configurations/:/app/configurations/
       - $PWD/data/source/:/app/data/source_zip
       - $PWD/logs/:/app/logs/
     environment:
       - GRAPH_CALCULATION_CRON_CYCLE=*/10 * * * * *
-      - XMS=20m
-      - XMX=8192m
+      - PROMETHEUS_URI=http://0.0.0.0:9090/metrics
+      - JVM_METRICS_ENABLED=False
+      - PUBLISH_NODE_PIPELINE_EXECUTION_TIME=False
+      - XMS=512m
+      - XMX=6144m
       - DATA_DIR_WATCH_INTERVAL=5
     logging:
       driver: json-file

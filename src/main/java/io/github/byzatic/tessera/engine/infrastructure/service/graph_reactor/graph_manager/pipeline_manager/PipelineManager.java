@@ -1,11 +1,14 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager;
 
 import io.github.byzatic.commons.schedulers.immediate.*;
+import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
+import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 import io.github.byzatic.tessera.engine.domain.model.node_pipeline.*;
 import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.observability.PrometheusMetricsAgent;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.MCg3WorkflowRoutineApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.StorageApi;
@@ -120,6 +123,32 @@ public class PipelineManager implements PipelineManagerInterface {
     @Override
     public void runPipeline() throws OperationIncompleteException {
         logger.debug("Run Pipeline for node {}", fullProjectRepository.getNode(graphNodeRef).getName());
+
+        Long start = null;
+        String nodeItemId = null;
+        String nodeItemUUID = null;
+        String nodeItemName = null;
+        String nodePath = null;
+        if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME) {
+            start = System.currentTimeMillis();
+            NodeItem nodeItem = fullProjectRepository.getNode(graphNodeRef);
+            nodeItemId = nodeItem.getId();
+            nodeItemUUID = nodeItem.getUUID();
+            nodeItemName = nodeItem.getName();
+
+            int size = pathToCurrentExecutionNodeRef.size();
+            StringBuilder sb = new StringBuilder(size * 24);
+            sb.append("[ ");
+            boolean first = true;
+            for (GraphNodeRef ref : pathToCurrentExecutionNodeRef) {
+                NodeItem node = fullProjectRepository.getNode(ref);
+                if (!first) sb.append(" ] - [ ");
+                sb.append(node.getName());
+                first = false;
+            }
+            sb.append(" ]");
+            nodePath = sb.toString();
+        }
 
         // 1) Sorted stages
         NodePipeline pipeline = fullProjectRepository.getPipeline(graphNodeRef);
@@ -277,6 +306,11 @@ public class PipelineManager implements PipelineManagerInterface {
                         scheduler.removeTask(id);
                     } catch (Throwable ignore) {
                     }
+                }
+                if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME) {
+                    long dur = System.currentTimeMillis() - start;
+                    PrometheusMetricsAgent.getInstance()
+                            .publishNodePipelineExecutionTime(dur, nodeItemId, nodeItemName, nodePath);
                 }
             }
         }

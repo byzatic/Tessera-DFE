@@ -41,6 +41,8 @@ build/
 logs/*
 # Игнорировать всё в data
 data/*
+# Игнорировать всё в flight_recording
+flight_recording/*
 # Не игнорировать саму папку data/configProject
 !data/configProject/
 # Игнорировать всё в data/configProject (внутри неё)

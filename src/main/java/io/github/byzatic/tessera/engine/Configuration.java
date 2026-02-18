@@ -10,6 +10,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -65,11 +66,13 @@ public class Configuration {
     public static final String CRON_EXPRESSION_STRING;
     public static final Boolean INITIALIZE_STORAGE_BY_REQUEST;
     public static final Path DATA_DIR;
-
     public static final Path PROJECTS_DIR;
     public static final String PROJECT_NAME;
     public static final Path PROJECT_SERVICES_PATH;
     public static final Path PROJECT_WORKFLOW_ROUTINES_PATH;
+    public static final URI PROMETHEUS_URI;
+    public static final Boolean JVM_METRICS_ENABLED;
+    public static final Boolean PUBLISH_NODE_PIPELINE_EXECUTION_TIME;
 
     private static Path initConfigFilePath() throws ConfigurationException {
         Path result;
@@ -218,6 +221,72 @@ public class Configuration {
         return result;
     }
 
+    private static URI initPrometheusURI(XMLConfiguration config) throws ConfigurationException {
+        URI result;
+        URI propertyPrometheusURI = (System.getProperty("prometheusURI", null) != null) ? URI.create(System.getProperty("prometheusURI")) : null;
+        URI configPrometheusURI = (config.getString("prometheusURI") != null) ? URI.create(config.getString("prometheusURI")) : null;
+        URI defaultPrometheusURI = URI.create("http://0.0.0.0:9090/metrics");
+
+        if (propertyPrometheusURI != null) {
+            // TODO: some checks for URI
+            result = propertyPrometheusURI;
+            logger.debug("(property) PROMETHEUS_URI = {}", propertyPrometheusURI);
+        } else if (configPrometheusURI != null) {
+            // TODO: some checks for URI
+            result = configPrometheusURI;
+            logger.debug("(config) PROMETHEUS_URI = {}", configPrometheusURI);
+        } else {
+            // TODO: some checks for URI
+            result = defaultPrometheusURI;
+            logger.debug("(default) PROMETHEUS_URI = {}", defaultPrometheusURI);
+        }
+        return result;
+    }
+
+    private static Boolean initJvmMetricsEnabled(XMLConfiguration config) throws ConfigurationException {
+        Boolean result;
+        Boolean propertyJvmMetricsEnabled = (System.getProperty("jvmMetricsEnabled", null) != null) ? Boolean.valueOf(System.getProperty("jvmMetricsEnabled")) : null;
+        Boolean configJvmMetricsEnabled = (config.getString("jvmMetricsEnabled") != null) ? Boolean.valueOf(config.getString("jvmMetricsEnabled")) : null;
+        Boolean defaultJvmMetricsEnabled = Boolean.FALSE;
+
+        if (propertyJvmMetricsEnabled != null) {
+            // TODO: some checks for URI
+            result = propertyJvmMetricsEnabled;
+            logger.debug("(property) JVM_METRICS_ENABLED = {}", propertyJvmMetricsEnabled);
+        } else if (configJvmMetricsEnabled != null) {
+            // TODO: some checks for URI
+            result = configJvmMetricsEnabled;
+            logger.debug("(config) JVM_METRICS_ENABLED = {}", configJvmMetricsEnabled);
+        } else {
+            // TODO: some checks for URI
+            result = defaultJvmMetricsEnabled;
+            logger.debug("(default) JVM_METRICS_ENABLED = {}", defaultJvmMetricsEnabled);
+        }
+        return result;
+    }
+
+    private static Boolean initPublishNodePipelineExecutionTime(XMLConfiguration config) throws ConfigurationException {
+        Boolean result;
+        Boolean propertyPublishNodePipelineExecutionTime = (System.getProperty("publishNodePipelineExecutionTime", null) != null) ? Boolean.valueOf(System.getProperty("publishNodePipelineExecutionTime")) : null;
+        Boolean configPublishNodePipelineExecutionTime = (config.getString("publishNodePipelineExecutionTime") != null) ? Boolean.valueOf(config.getString("publishNodePipelineExecutionTime")) : null;
+        Boolean defaultPublishNodePipelineExecutionTime = Boolean.FALSE;
+
+        if (propertyPublishNodePipelineExecutionTime != null) {
+            // TODO: some checks for URI
+            result = propertyPublishNodePipelineExecutionTime;
+            logger.debug("(property) PUBLISH_NODE_PIPELINE_EXECUTION_TIME = {}", propertyPublishNodePipelineExecutionTime);
+        } else if (configPublishNodePipelineExecutionTime != null) {
+            // TODO: some checks for URI
+            result = configPublishNodePipelineExecutionTime;
+            logger.debug("(config) PUBLISH_NODE_PIPELINE_EXECUTION_TIME = {}", configPublishNodePipelineExecutionTime);
+        } else {
+            // TODO: some checks for URI
+            result = defaultPublishNodePipelineExecutionTime;
+            logger.debug("(default) PUBLISH_NODE_PIPELINE_EXECUTION_TIME = {}", defaultPublishNodePipelineExecutionTime);
+        }
+        return result;
+    }
+
     public static String readSpecificationVersion() {
         String version = "UNDEFINED";
         String packageVersion = Configuration.class.getPackage().getSpecificationVersion();;
@@ -282,6 +351,12 @@ public class Configuration {
             PROJECT_SERVICES_PATH = initProjectServicesPath(config);
 
             PROJECT_WORKFLOW_ROUTINES_PATH = initWorkflowRoutinesPath(config);
+
+            PROMETHEUS_URI = initPrometheusURI(config);
+
+            JVM_METRICS_ENABLED = initJvmMetricsEnabled(config);
+
+            PUBLISH_NODE_PIPELINE_EXECUTION_TIME = initPublishNodePipelineExecutionTime(config);
 
             logger.debug("Configuration complete.");
         } catch (ConfigurationException ce) {

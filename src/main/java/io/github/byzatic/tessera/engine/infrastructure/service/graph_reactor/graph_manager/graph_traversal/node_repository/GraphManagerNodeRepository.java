@@ -11,33 +11,53 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInterface {
-    private final static Logger logger = LoggerFactory.getLogger(GraphManagerNodeRepository.class);
-    Map<GraphNodeRef, Node> nodeRefNodeMap = new HashMap<>();
 
-    List<GraphNodeRef> listRoot = new ArrayList<>();
+    private static final Logger logger = LoggerFactory.getLogger(GraphManagerNodeRepository.class);
+
+    // main storage
+    private Map<GraphNodeRef, Node> nodeRefNodeMap = new HashMap<>();
+
+    // cached roots (GraphNodeRef with indegree == 0)
+    private List<GraphNodeRef> listRoot = new ArrayList<>();
+
+    // cached downstream resolved to Node objects (hot path optimisation)
+    private final Map<GraphNodeRef, List<Node>> downstreamCache = new HashMap<>();
 
     public GraphManagerNodeRepository(@NotNull FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
         try {
             logger.debug("Initialise GraphManagerNodeRepository");
-            ObjectsUtils.requireNonNull(fullProjectRepository, new IllegalArgumentException(FullProjectRepository.class.getSimpleName() + " should be NotNull"));
+            ObjectsUtils.requireNonNull(
+                    fullProjectRepository,
+                    new IllegalArgumentException(FullProjectRepository.class.getSimpleName() + " should be NotNull")
+            );
+
             List<GraphNodeRef> graphNodeRefs = fullProjectRepository.listGraphNodeRef();
             logger.debug("List of all GraphNodeRef size is {}", graphNodeRefs.size());
+
+            // build nodeRef -> Node map
             for (GraphNodeRef graphNodeRef : graphNodeRefs) {
                 NodeItem nodeItem = fullProjectRepository.getNode(graphNodeRef);
                 Node newNode = Node.newBuilder()
                         .setGraphNodeRef(graphNodeRef)
                         .setDownstream(nodeItem.getDownstream())
                         .build();
+
                 nodeRefNodeMap.put(graphNodeRef, newNode);
-                createRootNodeList();
-                logger.debug("Initialisation of GraphManagerNodeRepository complete");
+
+                // keep debug very light; this line is expensive on large graphs if debug enabled
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Node {} updated with {}", nodeItem.getUUID(), graphNodeRef);
+                }
             }
+
+            // roots + downstream cache
+            createRootNodeListV2();
+            rebuildDownstreamCache();
+
+            logger.debug("Initialisation of GraphManagerNodeRepository complete");
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
@@ -47,7 +67,9 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
         try {
             ObjectsUtils.requireNonNull(nodeRefNodeMap, new IllegalArgumentException("Map<GraphNodeRef, Node> should be NotNull"));
             this.nodeRefNodeMap = nodeRefNodeMap;
-            createRootNodeList();
+
+            createRootNodeListV2();
+            rebuildDownstreamCache();
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
@@ -58,9 +80,12 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
     public synchronized Node getNode(@NotNull GraphNodeRef graphNodeRef) throws OperationIncompleteException {
         logger.debug("Request get Node by {}", graphNodeRef);
         ObjectsUtils.requireNonNull(graphNodeRef, new IllegalArgumentException(GraphNodeRef.class.getSimpleName() + " should be NotNull"));
-        if (!nodeRefNodeMap.containsKey(graphNodeRef))
-            throw new OperationIncompleteException("No such Node was found by " + graphNodeRef);
+
         Node node = nodeRefNodeMap.get(graphNodeRef);
+        if (node == null) {
+            throw new OperationIncompleteException("No such Node was found by " + graphNodeRef);
+        }
+
         logger.debug("Returns Node requested by {}", graphNodeRef);
         logger.trace("Returns Node {} requested by {}", node, graphNodeRef);
         return node;
@@ -76,20 +101,30 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
         return graphNodeRefs;
     }
 
+    /**
+     * HOT PATH.
+     * Returns resolved downstream nodes from cache.
+     * Keeps synchronized as requested.
+     */
     @NotNull
     @Override
     public synchronized List<Node> getNodeDownstream(@NotNull Node node) throws OperationIncompleteException {
-        logger.debug("Request get List downstream for jpa_like_node_repository {}", node);
+        // NOTE: avoid containsValue(node) - it's O(n) and kills CPU on large graphs.
         ObjectsUtils.requireNonNull(node, new IllegalArgumentException(Node.class.getSimpleName() + " should be NotNull"));
-        if (!nodeRefNodeMap.containsValue(node))
-            throw new OperationIncompleteException("No such Node was found by " + node);
-        List<Node> downstream = new ArrayList<>();
-        for (GraphNodeRef graphNodeRef : node.getDownstream()) {
-            downstream.add(nodeRefNodeMap.get(graphNodeRef));
+
+        GraphNodeRef ref = node.getGraphNodeRef();
+        List<Node> cached = downstreamCache.get(ref);
+
+        if (cached == null) {
+            // fallback (should not happen in normal flow)
+            Node fromMap = nodeRefNodeMap.get(ref);
+            if (fromMap == null) {
+                throw new OperationIncompleteException("No such Node was found by " + node);
+            }
+            return List.of();
         }
-        logger.debug("Returns List downstream of size {} for jpa_like_node_repository {}", downstream.size(), node);
-        logger.trace("Returns List downstream {} for jpa_like_node_repository {}", downstream, node);
-        return downstream;
+
+        return cached;
     }
 
     @NotNull
@@ -97,14 +132,18 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
     public synchronized List<Node> getNodeDownstream(@NotNull GraphNodeRef graphNodeRef) throws OperationIncompleteException {
         logger.debug("Request get List downstream for jpa_like_node_repository by GraphNodeRef {}", graphNodeRef);
         ObjectsUtils.requireNonNull(graphNodeRef, new IllegalArgumentException(GraphNodeRef.class.getSimpleName() + " should be NotNull"));
-        if (!nodeRefNodeMap.containsKey(graphNodeRef))
+
+        if (!nodeRefNodeMap.containsKey(graphNodeRef)) {
             throw new OperationIncompleteException("No such Node was found by " + graphNodeRef);
-        Node node = nodeRefNodeMap.get(graphNodeRef);
-        return getNodeDownstream(node);
+        }
+
+        List<Node> cached = downstreamCache.get(graphNodeRef);
+        return cached != null ? cached : List.of();
     }
 
     private void createRootNodeList() {
-        logger.debug("Searching for Roots");
+        // Legacy O(n²) method (kept for compatibility).
+        logger.debug("Searching for Roots (legacy)");
         List<GraphNodeRef> listAllDownstream = new ArrayList<>();
         for (Map.Entry<GraphNodeRef, Node> nodeRefNodeSet : nodeRefNodeMap.entrySet()) {
             List<GraphNodeRef> downstream = nodeRefNodeSet.getValue().getDownstream();
@@ -121,6 +160,57 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
         listRoot = listAllRoot;
     }
 
+    private void createRootNodeListV2() {
+        // O(n) roots calculation.
+        logger.debug("Searching for Roots");
+
+        Set<GraphNodeRef> allDownstream = new HashSet<>();
+
+        for (Node node : nodeRefNodeMap.values()) {
+            allDownstream.addAll(node.getDownstream());
+        }
+
+        List<GraphNodeRef> roots = new ArrayList<>();
+
+        for (GraphNodeRef ref : nodeRefNodeMap.keySet()) {
+            if (!allDownstream.contains(ref)) {
+                roots.add(ref);
+            }
+        }
+
+        logger.debug("Searching for Roots complete; listAllRoot size is {}", roots.size());
+        listRoot = roots;
+    }
+
+    /**
+     * Builds cache: GraphNodeRef -> resolved downstream Node list.
+     * This removes repeated allocations in getNodeDownstream().
+     */
+    private void rebuildDownstreamCache() {
+        downstreamCache.clear();
+
+        for (Map.Entry<GraphNodeRef, Node> e : nodeRefNodeMap.entrySet()) {
+            GraphNodeRef ref = e.getKey();
+            Node node = e.getValue();
+
+            List<GraphNodeRef> downstreamRefs = node.getDownstream();
+            if (downstreamRefs == null || downstreamRefs.isEmpty()) {
+                downstreamCache.put(ref, List.of());
+                continue;
+            }
+
+            List<Node> resolved = new ArrayList<>(downstreamRefs.size());
+            for (GraphNodeRef childRef : downstreamRefs) {
+                Node child = nodeRefNodeMap.get(childRef);
+                if (child != null) {
+                    resolved.add(child);
+                }
+            }
+
+            downstreamCache.put(ref, Collections.unmodifiableList(resolved));
+        }
+    }
+
     @Override
     @NotNull
     public synchronized List<GraphNodeRef> getRootNodes() throws OperationIncompleteException {
@@ -132,10 +222,10 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
 
     @Override
     public @NotNull void clearNodeStatuses() throws OperationIncompleteException {
+        // leaving unsynchronized as in original code
         for (Map.Entry<GraphNodeRef, Node> nodeEntry : nodeRefNodeMap.entrySet()) {
             Node node = nodeEntry.getValue();
             node.setNodeLifecycleState(NodeLifecycleState.NOTSTATED);
         }
     }
-
 }
