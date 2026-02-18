@@ -13,19 +13,29 @@ Tessera Data Flow Engine is a modular execution system based on directed acyclic
 ## Документация
 - [Конфигурирование Tessera DFE](.docs%2Fengine%2Fconfiguration%2FRU_README_Tessera_Configuration.md)
 - [Общая структура проекта Tessera-DFE](.docs%2Fproject%2FRU_README_Main.md)
+- [Общая структура проекта Tessera-DFE](.docs%2Fproject%2FRU_README_Main.md)
+- [Observability Tessera DFE](.docs%2Fobservability%2FRU_README_Tessera_Observability.md)
 
 ## Конфигурирование (краткий мануал)
 Конфигурационный файл: `configuration.xml` по пути configurations/configuration.xml
 ```xml
 <Configuration>
-    <graphCalculationCronCycle>*/10 * * * * *</graphCalculationCronCycle>
-    <initializeStorageByRequest>false</initializeStorageByRequest>
-    <!--<dataDirectory>/home/user/Tessera-DFE/data/projects/</dataDirectory>-->
-    <projectName>MyAwesomeProject</projectName>
+  <graphCalculationCronCycle>0 */5 * * * *</graphCalculationCronCycle>
+  <projectName>MyAwesomeProject</projectName>
+  <prometheusURI>http://0.0.0.0:9090/metrics</prometheusURI>
+  <jvmMetricsEnabled>False</jvmMetricsEnabled>
+  <publishNodePipelineExecutionTime>False</publishNodePipelineExecutionTime>
 </Configuration>
 ```
-- graphCalculationCronCycle - интервал выполнения расчета графа
-- projectName - имя проекта (в данном случае MyAwesomeProject)
+- `graphCalculationCronCycle` - интервал выполнения расчета графа
+- `projectName` - имя проекта (в данном случае MyAwesomeProject)
+- `prometheusURI` - HTTP-адрес эндпоинта, на котором Tessera публикует метрики в формате Prometheus (`/metrics`).
+- `jvmMetricsEnabled` - Булево значение (`True`/`False`). Включает публикацию JVM-метрик (heap, GC, threads и др.) в  Prometheus-эндпоинт.
+- `publishNodePipelineExecutionTime` - Булево значение (`True`/`False`). Публикует метрику
+времени выполнения узлов пайплайна. **Снижает
+производительность**. Использовать только для отладки
+графа.
+
 
 Примечаение graphCalculationCronCycle
 ```text
@@ -241,7 +251,10 @@ docker run -d --name tessera-data-flow-engine \
   -v "$PWD/data/source/:/app/data/source_zip" \
   -v "$PWD/logs/:/app/logs/" \
   -e GRAPH_CALCULATION_CRON_CYCLE='*/10 * * * * *' \
-  -e XMS=20m -e XMX=8192m \
+  -e PROMETHEUS_URI='http://0.0.0.0:9090/metrics' \
+  -e JVM_METRICS_ENABLED='True' \
+  -e PUBLISH_NODE_PIPELINE_EXECUTION_TIME='False' \
+  -e XMS=512m -e XMX=8192m \
   -e DATA_DIR_WATCH_INTERVAL=5 \
   --restart unless-stopped \
   byzatic/tessera-data-flow-engine:latest
