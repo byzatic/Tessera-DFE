@@ -10,12 +10,12 @@ import io.github.byzatic.tessera.storageapi.dto.DataValueInterface;
 import io.github.byzatic.tessera.storageapi.dto.StorageItem;
 import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncompleteException;
 import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
-import org.apache.commons.math3.util.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 
 public class StorageApi implements StorageApiInterface {
@@ -187,7 +187,7 @@ public class StorageApi implements StorageApiInterface {
     public List<StorageItem> listStorageObjects(StorageItem storageItem) throws MCg3ApiOperationIncompleteException {
         StorageItem.ScopeType scope = storageItem.getScope();
         List<StorageItem> foundedStorageItems = new ArrayList<>();
-        List<Pair<String, DataValueInterface>> listItemFromStorage;
+        List<Map.Entry<String, DataValueInterface>> listItemFromStorage;
         try {
             switch (scope) {
                 case LOCAL -> {
@@ -213,14 +213,14 @@ public class StorageApi implements StorageApiInterface {
                 }
                 default -> throw new MCg3ApiOperationIncompleteException("Unknown scope");
             }
-            for (Pair<String, DataValueInterface> data : listItemFromStorage) {
+            for (Map.Entry<String, DataValueInterface> data : listItemFromStorage) {
                 foundedStorageItems.add(
                         StorageItem.newBuilder()
                                 .setScope(storageItem.getScope())
                                 .setDownstreamName(storageItem.getDownstreamName())
                                 .setStorageId(storageItem.getStorageId())
-                                .setDataId(data.getFirst())
-                                .setDataValue(data.getSecond())
+                                .setDataId(data.getKey())
+                                .setDataValue(data.getValue())
                                 .build()
                 );
             }
