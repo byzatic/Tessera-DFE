@@ -126,14 +126,13 @@ public class PipelineManager implements PipelineManagerInterface {
 
         Long start = null;
         String nodeItemId = null;
-        String nodeItemUUID = null;
         String nodeItemName = null;
         String nodePath = null;
+
         if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME) {
             start = System.currentTimeMillis();
             NodeItem nodeItem = fullProjectRepository.getNode(graphNodeRef);
             nodeItemId = nodeItem.getId();
-            nodeItemUUID = nodeItem.getUUID();
             nodeItemName = nodeItem.getName();
 
             int size = pathToCurrentExecutionNodeRef.size();
@@ -177,45 +176,51 @@ public class PipelineManager implements PipelineManagerInterface {
             final List<UUID> stageJobs = new ArrayList<>();
             final Map<UUID, HealthFlagProxy> healthByJob = new ConcurrentHashMap<>();
             final CountDownLatch stageFinished = new CountDownLatch(workersDescriptionItemList.size());
-            final Set<UUID> stageJobSet = Collections.newSetFromMap(new ConcurrentHashMap<UUID, Boolean>());
+            final Set<UUID> stageJobSet = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-            // Listener на терминальные события ТОЛЬКО наших джоб стадии
+            // Закрываем гонку: если worker job завершился до того, как listener увидел stageJobSet.add(jobId),
+            // мы "догоняем" терминальное состояние сразу после регистрации jobId.
+            final java.util.function.Consumer<UUID> maybeCountDown = (UUID id) -> {
+                if (id == null) return;
+                if (!stageJobSet.contains(id)) return;
+
+                Optional<JobInfo> info;
+                try {
+                    info = scheduler.query(id);
+                } catch (Throwable t) {
+                    return;
+                }
+                if (info.isEmpty()) return;
+
+                JobState s = info.get().state;
+                if (s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT) {
+                    stageFinished.countDown();
+                }
+            };
+
             final JobEventListener stageListener = new JobEventListener() {
-                private boolean isTerminal(UUID id) {
-                    Optional<JobInfo> info = scheduler.query(id);
-                    if (info.isEmpty()) return false;
-                    JobState s = info.get().state;
-                    return s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT;
-                }
-
-                private void maybeCountDown(UUID id) {
-                    if (id != null && stageJobSet.contains(id) && isTerminal(id)) {
-                        stageFinished.countDown();
-                    }
-                }
-
                 @Override
                 public void onStart(UUID jobId) {
                 }
 
                 @Override
                 public void onComplete(UUID jobId) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
 
                 @Override
                 public void onError(UUID jobId, Throwable error) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
 
                 @Override
                 public void onTimeout(UUID jobId) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
 
                 @Override
                 public void onCancelled(UUID jobId) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
             };
             scheduler.addListener(stageListener);
@@ -224,8 +229,7 @@ public class PipelineManager implements PipelineManagerInterface {
                 // 3.1) enqueue all workers in the stage
                 for (WorkersDescriptionItem workersDescriptionItem : workersDescriptionItemList) {
                     String workerName = workersDescriptionItem.getName();
-                    String workerDescription = workersDescriptionItem.getDescription();
-                    List<ConfigurationFilesItem> workerConfigurationFilesList = workersDescriptionItem.getConfigurationFiles(); // -> ConfigurationParameter
+                    List<ConfigurationFilesItem> workerConfigurationFilesList = workersDescriptionItem.getConfigurationFiles();
 
                     List<ConfigurationParameter> configurationParameterList = new ArrayList<>();
                     if (workerConfigurationFilesList != null) {
@@ -233,18 +237,11 @@ public class PipelineManager implements PipelineManagerInterface {
                             configurationParameterList.add(
                                     ConfigurationParameter.newBuilder()
                                             .parameterKey(configurationFilesItem.getDescription())
-                                            .parameterValue(
-                                                    pathResolver.processTemplate(configurationFilesItem.getConfigurationFileId())
-                                            )
+                                            .parameterValue(pathResolver.processTemplate(configurationFilesItem.getConfigurationFileId()))
                                             .build()
                             );
                         }
                     }
-
-                    String uniqueId =
-                            stagesDescriptionItem.getStageId()
-                                    + "-" + workerName
-                                    + "-" + UUID.randomUUID().toString().replace("-", "");
 
                     HealthFlagProxy healthFlagProxy = HealthFlagProxy.newBuilder().build();
 
@@ -262,13 +259,15 @@ public class PipelineManager implements PipelineManagerInterface {
                             healthFlagProxy
                     );
 
-                    // ImmediateScheduler: Task wrapper
                     Task task = new WorkflowRoutineTask(workflowRoutine);
 
                     UUID jobId = scheduler.addTask(task);
                     stageJobs.add(jobId);
                     stageJobSet.add(jobId);
                     healthByJob.put(jobId, healthFlagProxy);
+
+                    // Ключ: догоняем терминал, если событие уже "пролетело"
+                    maybeCountDown.accept(jobId);
 
                     logger.info("Scheduled workflowRoutine worker={} stage={} jobId={}",
                             workerName, stagesDescriptionItem.getStageId(), jobId);
@@ -299,7 +298,6 @@ public class PipelineManager implements PipelineManagerInterface {
                 Thread.currentThread().interrupt();
                 throw new OperationIncompleteException("Interrupted while waiting stage " + stagesDescriptionItem.getStageId(), ie);
             } finally {
-                // remove stage listener & cleanup tasks
                 scheduler.removeListener(stageListener);
                 for (UUID id : stageJobs) {
                     try {

@@ -122,42 +122,49 @@ public class GraphManager implements GraphManagerInterface {
             final Set<UUID> jobIdSet = Collections.newSetFromMap(new ConcurrentHashMap<>());
             final CountDownLatch barrier = new CountDownLatch(rootRefs.size());
 
+            // Закрываем гонку: если задача завершилась ДО того, как listener увидел jobIdSet.add(id),
+            // мы "догоняем" терминальное состояние сразу после регистрации id.
+            final java.util.function.Consumer<UUID> maybeCountDown = (UUID id) -> {
+                if (id == null) return;
+                if (!jobIdSet.contains(id)) return;
+
+                Optional<JobInfo> info;
+                try {
+                    info = scheduler.query(id);
+                } catch (Throwable t) {
+                    return;
+                }
+                if (info.isEmpty()) return;
+
+                JobState s = info.get().state;
+                if (s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT) {
+                    barrier.countDown();
+                }
+            };
+
             final JobEventListener stageListener = new JobEventListener() {
-                private boolean isTerminal(UUID id) {
-                    Optional<JobInfo> info = scheduler.query(id);
-                    if (info.isEmpty()) return false;
-                    JobState s = info.get().state;
-                    return s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT;
-                }
-
-                private void maybeCountDown(UUID id) {
-                    if (id != null && jobIdSet.contains(id) && isTerminal(id)) {
-                        barrier.countDown();
-                    }
-                }
-
                 @Override
                 public void onStart(UUID jobId) {
                 }
 
                 @Override
                 public void onComplete(UUID jobId) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
 
                 @Override
                 public void onError(UUID jobId, Throwable error) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
 
                 @Override
                 public void onTimeout(UUID jobId) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
 
                 @Override
                 public void onCancelled(UUID jobId) {
-                    maybeCountDown(jobId);
+                    maybeCountDown.accept(jobId);
                 }
             };
             scheduler.addListener(stageListener);
@@ -175,6 +182,9 @@ public class GraphManager implements GraphManagerInterface {
 
                     jobIds.add(id);
                     jobIdSet.add(id);
+
+                    // Ключ: догоняем терминал, если событие уже "пролетело"
+                    maybeCountDown.accept(id);
 
                     logger.info("Scheduled graph traversal for root={} jobId={}", ref, id);
                 }
@@ -196,8 +206,8 @@ public class GraphManager implements GraphManagerInterface {
                 }
 
                 long dur = System.currentTimeMillis() - start;
-                PrometheusMetricsAgent.getInstance()
-                        .publishGraphExecutionTime(dur);
+                PrometheusMetricsAgent.getInstance().publishGraphExecutionTime(dur);
+                PrometheusMetricsAgent.getInstance().incrementGraphExecutions();
 
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
