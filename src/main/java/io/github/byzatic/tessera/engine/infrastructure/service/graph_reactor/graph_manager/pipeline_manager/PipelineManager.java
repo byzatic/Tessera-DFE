@@ -29,19 +29,19 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * PipelineManager rewritten to use ImmediateScheduler.
- * <p>
- * Semantics:
- * - For each stage (by position), all workers are scheduled in parallel.
- * - We wait until ALL workers in the current stage finish (complete/fail/timeout/cancel),
- * then verify health flags and proceed to the next stage.
- * - Unique IDs kept for diagnostics.
- * <p>
- * Construction modes:
- * (1) External scheduler injection (share with orchestration, attach listeners).
- * (2) Self-hosted scheduler (created internally via Builder).
+ * PipelineManager на ImmediateScheduler.
+ *
+ * Цели реализации:
+ * - Параллельно запускать workers внутри стадии.
+ * - Ждать завершения всей стадии и валидировать результаты (JobState + HealthFlag).
+ * - НЕ плодить listeners на shared scheduler (иначе деградация по времени на каждой итерации).
+ *
+ * Важное правило владения:
+ * - Если scheduler внешний (shared) — PipelineManager не должен "засорять" его listeners’ами.
+ *   Поэтому используется global hub: один listener на scheduler + map jobId -> callback.
  */
 public class PipelineManager implements PipelineManagerInterface {
+
     private static final Logger logger = LoggerFactory.getLogger(PipelineManager.class);
 
     private final ImmediateSchedulerInterface scheduler;
@@ -55,7 +55,84 @@ public class PipelineManager implements PipelineManagerInterface {
     private final ExecutionContextFactoryInterface executionContextFactory;
     private final FullProjectRepository fullProjectRepository;
 
-    // ===== Constructor with external scheduler (preferred) =====
+    /**
+     * Hub терминальных событий для КОНКРЕТНОГО scheduler.
+     * Ставим listener один раз на scheduler, дальше просто регистрируем callbacks по jobId.
+     *
+     * Это убирает:
+     * - рост количества listeners с итерациями,
+     * - аллокации/копирования из-за CopyOnWriteArrayList.removeListener().
+     */
+    private static final class SchedulerTerminalHub {
+        private final ConcurrentHashMap<UUID, Runnable> onTerminal = new ConcurrentHashMap<>();
+
+        private final JobEventListener listener = new JobEventListener() {
+            private void fire(UUID jobId) {
+                if (jobId == null) return;
+                Runnable r = onTerminal.remove(jobId);
+                if (r != null) {
+                    try { r.run(); } catch (Throwable ignore) {}
+                }
+            }
+
+            @Override public void onStart(UUID jobId) {}
+            @Override public void onComplete(UUID jobId) { fire(jobId); }
+            @Override public void onError(UUID jobId, Throwable error) { fire(jobId); }
+            @Override public void onTimeout(UUID jobId) { fire(jobId); }
+            @Override public void onCancelled(UUID jobId) { fire(jobId); }
+        };
+
+        void register(UUID jobId, Runnable callback) {
+            if (jobId == null || callback == null) return;
+            onTerminal.put(jobId, callback);
+        }
+
+        void unregister(UUID jobId) {
+            if (jobId == null) return;
+            onTerminal.remove(jobId);
+        }
+
+        /**
+         * Закрываем гонку: если job уже терминальный к моменту регистрации callback — "догоняем" вручную.
+         */
+        void maybeFireIfTerminal(ImmediateSchedulerInterface scheduler, UUID jobId) {
+            if (jobId == null) return;
+            Optional<JobInfo> info;
+            try {
+                info = scheduler.query(jobId);
+            } catch (Throwable t) {
+                return;
+            }
+            if (info.isEmpty()) return;
+
+            JobState s = info.get().state;
+            if (s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT) {
+                Runnable r = onTerminal.remove(jobId);
+                if (r != null) {
+                    try { r.run(); } catch (Throwable ignore) {}
+                }
+            }
+        }
+    }
+
+    /**
+     * Глобальная привязка hub’ов к scheduler’ам.
+     * Нужна для shared scheduler: один listener на инстанс scheduler’а на весь runtime.
+     */
+    private static final ConcurrentHashMap<ImmediateSchedulerInterface, SchedulerTerminalHub> HUBS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<ImmediateSchedulerInterface, Boolean> HUB_INSTALLED = new ConcurrentHashMap<>();
+
+    private static SchedulerTerminalHub hubFor(ImmediateSchedulerInterface scheduler) {
+        SchedulerTerminalHub hub = HUBS.computeIfAbsent(scheduler, s -> new SchedulerTerminalHub());
+
+        // install once per scheduler
+        if (HUB_INSTALLED.putIfAbsent(scheduler, Boolean.TRUE) == null) {
+            scheduler.addListener(hub.listener);
+        }
+        return hub;
+    }
+
+    // ===== Constructor with external scheduler (shared) =====
     public PipelineManager(GraphNodeRef graphNodeRef,
                            List<GraphNodeRef> pathToCurrentExecutionNodeRef,
                            FullProjectRepository fullProjectRepository,
@@ -65,6 +142,7 @@ public class PipelineManager implements PipelineManagerInterface {
                            ExecutionContextFactoryInterface executionContextFactory,
                            ImmediateSchedulerInterface scheduler,
                            JobEventListener... listeners) throws OperationIncompleteException {
+
         this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
         this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
         this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
@@ -73,6 +151,7 @@ public class PipelineManager implements PipelineManagerInterface {
         this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.ownsScheduler = false;
+
         try {
             Objects.requireNonNull(pathManagerInterface, "pathManagerInterface");
             this.pathResolver = new SupportPathResolver(
@@ -82,14 +161,17 @@ public class PipelineManager implements PipelineManagerInterface {
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
-        // external listeners
+
+        // Внешние listeners — это ответственность оркестрации.
+        // Если всё же прокидываешь сюда listeners — они добавятся на shared scheduler и тоже могут размножаться.
         if (listeners != null) {
             for (JobEventListener l : listeners) {
                 if (l != null) this.scheduler.addListener(l);
             }
         }
-        // internal lightweight logger
-        this.scheduler.addListener(new LoggingListener());
+
+        // Ключевое: ставим terminal hub listener ровно один раз на scheduler
+        hubFor(this.scheduler);
     }
 
     // ===== Constructor with self-hosted scheduler =====
@@ -100,14 +182,20 @@ public class PipelineManager implements PipelineManagerInterface {
                            StorageManagerInterface storageManager,
                            PathManagerInterface pathManagerInterface,
                            ExecutionContextFactoryInterface executionContextFactory) throws OperationIncompleteException {
+
         this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
         this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
         this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
-        this.scheduler = new ImmediateScheduler.Builder().defaultGrace(Duration.ofSeconds(10)).build();
+
+        this.scheduler = new ImmediateScheduler.Builder()
+                .defaultGrace(Duration.ofSeconds(10))
+                .build();
+
         this.ownsScheduler = true;
+
         try {
             Objects.requireNonNull(pathManagerInterface, "pathManagerInterface");
             this.pathResolver = new SupportPathResolver(
@@ -117,20 +205,26 @@ public class PipelineManager implements PipelineManagerInterface {
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
-        this.scheduler.addListener(new LoggingListener());
+
+        // Для self-hosted scheduler логика та же: hub listener ставится один раз
+        hubFor(this.scheduler);
     }
 
     @Override
     public void runPipeline() throws OperationIncompleteException {
         logger.debug("Run Pipeline for node {}", fullProjectRepository.getNode(graphNodeRef).getName());
 
-        Long start = null;
+        final SchedulerTerminalHub hub = hubFor(this.scheduler);
+
+        Long startMs = null;
         String nodeItemId = null;
         String nodeItemName = null;
         String nodePath = null;
 
+        // node_path нужен, но строим его один раз на весь pipeline
         if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME) {
-            start = System.currentTimeMillis();
+            startMs = System.currentTimeMillis();
+
             NodeItem nodeItem = fullProjectRepository.getNode(graphNodeRef);
             nodeItemId = nodeItem.getId();
             nodeItemName = nodeItem.getName();
@@ -149,141 +243,84 @@ public class PipelineManager implements PipelineManagerInterface {
             nodePath = sb.toString();
         }
 
-        // 1) Sorted stages
         NodePipeline pipeline = fullProjectRepository.getPipeline(graphNodeRef);
+
         List<StagesConsistencyItem> stagesConsistencyItemList = new ArrayList<>(pipeline.getStagesConsistency());
         stagesConsistencyItemList.sort(Comparator.comparingInt(StagesConsistencyItem::getPosition));
-        logger.debug("Sort stagesConsistencyItemList by Position complete");
 
-        // 2) Map<StageId, StagesDescriptionItem>
-        List<StagesDescriptionItem> stagesDescriptionItemList = pipeline.getStagesDescription();
-        Map<String, StagesDescriptionItem> stageMap = stagesDescriptionItemList.stream()
+        Map<String, StagesDescriptionItem> stageMap = pipeline.getStagesDescription().stream()
                 .collect(Collectors.toMap(StagesDescriptionItem::getStageId, Function.identity()));
-        logger.debug("Prepare Map<StageId, StagesDescriptionItem> complete");
 
-        // 3) Stage-by-stage execution
-        for (StagesConsistencyItem stagesConsistencyItem : stagesConsistencyItemList) {
-            if (!stageMap.containsKey(stagesConsistencyItem.getStageId())) {
-                throw new OperationIncompleteException("StageId " + stagesConsistencyItem.getStageId() + " hasn't description");
+        for (StagesConsistencyItem stageConsistency : stagesConsistencyItemList) {
+            StagesDescriptionItem stage = stageMap.get(stageConsistency.getStageId());
+            if (stage == null) {
+                throw new OperationIncompleteException("StageId " + stageConsistency.getStageId() + " hasn't description");
             }
-            StagesDescriptionItem stagesDescriptionItem = stageMap.get(stagesConsistencyItem.getStageId());
-            List<WorkersDescriptionItem> workersDescriptionItemList = stagesDescriptionItem.getWorkersDescription();
-            if (workersDescriptionItemList == null || workersDescriptionItemList.isEmpty()) {
-                logger.info("Stage {} has no workers — skipping", stagesDescriptionItem.getStageId());
+
+            List<WorkersDescriptionItem> workers = stage.getWorkersDescription();
+            if (workers == null || workers.isEmpty()) {
+                logger.info("Stage {} has no workers — skipping", stage.getStageId());
                 continue;
             }
 
-            final List<UUID> stageJobs = new ArrayList<>();
+            final CountDownLatch stageFinished = new CountDownLatch(workers.size());
+            final List<UUID> stageJobs = new ArrayList<>(workers.size());
             final Map<UUID, HealthFlagProxy> healthByJob = new ConcurrentHashMap<>();
-            final CountDownLatch stageFinished = new CountDownLatch(workersDescriptionItemList.size());
-            final Set<UUID> stageJobSet = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
-            // Закрываем гонку: если worker job завершился до того, как listener увидел stageJobSet.add(jobId),
-            // мы "догоняем" терминальное состояние сразу после регистрации jobId.
-            final java.util.function.Consumer<UUID> maybeCountDown = (UUID id) -> {
-                if (id == null) return;
-                if (!stageJobSet.contains(id)) return;
-
-                Optional<JobInfo> info;
-                try {
-                    info = scheduler.query(id);
-                } catch (Throwable t) {
-                    return;
-                }
-                if (info.isEmpty()) return;
-
-                JobState s = info.get().state;
-                if (s == JobState.COMPLETED || s == JobState.FAILED || s == JobState.CANCELLED || s == JobState.TIMEOUT) {
-                    stageFinished.countDown();
-                }
-            };
-
-            final JobEventListener stageListener = new JobEventListener() {
-                @Override
-                public void onStart(UUID jobId) {
-                }
-
-                @Override
-                public void onComplete(UUID jobId) {
-                    maybeCountDown.accept(jobId);
-                }
-
-                @Override
-                public void onError(UUID jobId, Throwable error) {
-                    maybeCountDown.accept(jobId);
-                }
-
-                @Override
-                public void onTimeout(UUID jobId) {
-                    maybeCountDown.accept(jobId);
-                }
-
-                @Override
-                public void onCancelled(UUID jobId) {
-                    maybeCountDown.accept(jobId);
-                }
-            };
-            scheduler.addListener(stageListener);
 
             try {
-                // 3.1) enqueue all workers in the stage
-                for (WorkersDescriptionItem workersDescriptionItem : workersDescriptionItemList) {
-                    String workerName = workersDescriptionItem.getName();
-                    List<ConfigurationFilesItem> workerConfigurationFilesList = workersDescriptionItem.getConfigurationFiles();
+                for (WorkersDescriptionItem worker : workers) {
+                    String workerName = worker.getName();
 
-                    List<ConfigurationParameter> configurationParameterList = new ArrayList<>();
-                    if (workerConfigurationFilesList != null) {
-                        for (ConfigurationFilesItem configurationFilesItem : workerConfigurationFilesList) {
-                            configurationParameterList.add(
-                                    ConfigurationParameter.newBuilder()
-                                            .parameterKey(configurationFilesItem.getDescription())
-                                            .parameterValue(pathResolver.processTemplate(configurationFilesItem.getConfigurationFileId()))
-                                            .build()
-                            );
+                    List<ConfigurationParameter> cfg = new ArrayList<>();
+                    List<ConfigurationFilesItem> cfgFiles = worker.getConfigurationFiles();
+                    if (cfgFiles != null) {
+                        for (ConfigurationFilesItem f : cfgFiles) {
+                            cfg.add(ConfigurationParameter.newBuilder()
+                                    .parameterKey(f.getDescription())
+                                    .parameterValue(pathResolver.processTemplate(f.getConfigurationFileId()))
+                                    .build());
                         }
                     }
 
-                    HealthFlagProxy healthFlagProxy = HealthFlagProxy.newBuilder().build();
+                    HealthFlagProxy health = HealthFlagProxy.newBuilder().build();
 
-                    WorkflowRoutineInterface workflowRoutine = moduleLoader.getModule(
+                    WorkflowRoutineInterface routine = moduleLoader.getModule(
                             workerName,
                             MCg3WorkflowRoutineApi.newBuilder()
                                     .setStorageApi(new StorageApi(storageManager, graphNodeRef, fullProjectRepository))
-                                    .setConfigurationParameters(configurationParameterList)
-                                    .setExecutionContext(
-                                            this.executionContextFactory.getExecutionContext(
-                                                    graphNodeRef, pathToCurrentExecutionNodeRef, stagesDescriptionItem, workersDescriptionItem, stagesConsistencyItem
-                                            )
-                                    )
+                                    .setConfigurationParameters(cfg)
+                                    .setExecutionContext(executionContextFactory.getExecutionContext(
+                                            graphNodeRef, pathToCurrentExecutionNodeRef,
+                                            stage, worker, stageConsistency
+                                    ))
                                     .build(),
-                            healthFlagProxy
+                            health
                     );
 
-                    Task task = new WorkflowRoutineTask(workflowRoutine);
-
-                    UUID jobId = scheduler.addTask(task);
+                    UUID jobId = scheduler.addTask(new WorkflowRoutineTask(routine));
                     stageJobs.add(jobId);
-                    stageJobSet.add(jobId);
-                    healthByJob.put(jobId, healthFlagProxy);
+                    healthByJob.put(jobId, health);
 
-                    // Ключ: догоняем терминал, если событие уже "пролетело"
-                    maybeCountDown.accept(jobId);
+                    // Регистрируем countDown на терминальное событие (снимется автоматически при fire)
+                    hub.register(jobId, stageFinished::countDown);
+                    hub.maybeFireIfTerminal(scheduler, jobId);
 
                     logger.info("Scheduled workflowRoutine worker={} stage={} jobId={}",
-                            workerName, stagesDescriptionItem.getStageId(), jobId);
+                            workerName, stage.getStageId(), jobId);
                 }
 
-                // 3.2) wait barrier
+                // Ждём окончания стадии
                 stageFinished.await();
 
-                // 3.3) post-stage validation
+                // Проверка результатов стадии
                 for (UUID jobId : stageJobs) {
                     JobInfo info = scheduler.query(jobId).orElse(null);
                     if (info == null) {
                         throw new OperationIncompleteException("Job " + jobId + " not found after stage completion");
                     }
                     if (info.state != JobState.COMPLETED) {
-                        String err = (info.lastError != null) ? info.lastError
+                        String err = (info.lastError != null)
+                                ? info.lastError
                                 : ("Job " + jobId + " ended with state " + info.state);
                         throw new OperationIncompleteException(err);
                     }
@@ -296,38 +333,36 @@ public class PipelineManager implements PipelineManagerInterface {
 
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
-                throw new OperationIncompleteException("Interrupted while waiting stage " + stagesDescriptionItem.getStageId(), ie);
+                throw new OperationIncompleteException("Interrupted while waiting stage " + stage.getStageId(), ie);
             } finally {
-                scheduler.removeListener(stageListener);
-                for (UUID id : stageJobs) {
-                    try {
-                        scheduler.removeTask(id);
-                    } catch (Throwable ignore) {
-                    }
+                // Best-effort cleanup:
+                // - если callback не успел сняться (например, не пришло событие) — удаляем руками
+                for (UUID jobId : stageJobs) {
+                    hub.unregister(jobId);
                 }
-                if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME) {
-                    long dur = System.currentTimeMillis() - start;
-                    PrometheusMetricsAgent.getInstance()
-                            .publishNodePipelineExecutionTime(dur, nodeItemId, nodeItemName, nodePath);
+                // - чистим задачи из scheduler registry
+                for (UUID jobId : stageJobs) {
+                    try { scheduler.removeTask(jobId); } catch (Throwable ignore) {}
                 }
             }
         }
+
+        // Метрика длительности pipeline на ноду — один раз по завершению pipeline
+        if (Configuration.PUBLISH_NODE_PIPELINE_EXECUTION_TIME && startMs != null) {
+            long dur = System.currentTimeMillis() - startMs;
+            PrometheusMetricsAgent.getInstance()
+                    .publishNodePipelineExecutionTime(dur, nodeItemId, nodeItemName, nodePath);
+        }
     }
 
-    /**
-     * If manager owns scheduler, call to close resources explicitly (optional).
-     */
     public void close() {
         if (ownsScheduler) {
-            try {
-                scheduler.close();
-            } catch (Exception ignored) {
-            }
+            try { scheduler.close(); } catch (Exception ignored) {}
         }
     }
 
     /**
-     * Adapter: WorkflowRoutineInterface -> ImmediateScheduler.Task
+     * Адаптер: WorkflowRoutineInterface -> ImmediateScheduler.Task
      */
     private static final class WorkflowRoutineTask implements Task {
         private final WorkflowRoutineInterface routine;
@@ -339,39 +374,13 @@ public class PipelineManager implements PipelineManagerInterface {
         @Override
         public void run(CancellationToken token) throws Exception {
             token.throwIfStopRequested();
-            routine.run(); // доменная работа рутины
+            routine.run();
             token.throwIfStopRequested();
         }
 
         @Override
         public void onStopRequested() {
-            // Если у рутины есть кооперативная остановка — вызвать здесь.
-            // if (routine instanceof SupportsStop s) { s.requestStop(); }
-        }
-    }
-
-    /**
-     * Лёгкий встроенный логирующий слушатель (опционален).
-     */
-    private static final class LoggingListener implements JobEventListener {
-        @Override
-        public void onStart(UUID jobId) {
-        }
-
-        @Override
-        public void onComplete(UUID jobId) {
-        }
-
-        @Override
-        public void onError(UUID jobId, Throwable error) {
-        }
-
-        @Override
-        public void onTimeout(UUID jobId) {
-        }
-
-        @Override
-        public void onCancelled(UUID jobId) {
+            // Если появится кооперативная остановка рутины — подключить здесь.
         }
     }
 }

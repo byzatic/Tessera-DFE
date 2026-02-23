@@ -207,7 +207,6 @@ public class GraphManager implements GraphManagerInterface {
 
                 long dur = System.currentTimeMillis() - start;
                 PrometheusMetricsAgent.getInstance().publishGraphExecutionTime(dur);
-                PrometheusMetricsAgent.getInstance().incrementGraphExecutions();
 
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
