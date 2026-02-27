@@ -1,3 +1,11 @@
+![Build](https://github.com/byzatic/Tessera-DFE/actions/workflows/main.yml/badge.svg)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![Java](https://img.shields.io/badge/Java-17-orange)
+![Docker Pulls](https://img.shields.io/docker/pulls/byzatic/tessera-data-flow-engine)
+![Docker Version](https://img.shields.io/docker/v/byzatic/tessera-data-flow-engine)
+![Prometheus](https://img.shields.io/badge/metrics-Prometheus-brightgreen)
+![Architecture](https://img.shields.io/badge/architecture-DAG-blueviolet)
+
 # Tessera Data Flow Engine
 Tessera Data Flow Engine is a modular execution system based on directed acyclic graphs (DAGs), designed to build flexible and extensible data processing pipelines. Each module (service/routine) represents an independent node that processes data and passes the result along the execution graph.
 
