@@ -7,27 +7,48 @@ PROJECTS_DIR="/app/data/projects"
 
 WATCH_DIRS=("${SOURCE_ZIP_DIR}" "${CONFIG_DIR_PATH}")
 DATA_DIR_WATCH_INTERVAL="${DATA_DIR_WATCH_INTERVAL:-60}"
+IS_ENABLE_WATCH="${IS_ENABLE_WATCH:-True}"   # Default = True
 
 JAR_PATH="/app/app.jar"
 
-GRAPH_CALCULATION_CRON_CYCLE="${GRAPH_CALCULATION_CRON_CYCLE:-*/10 * * * * *}"
-INITIALIZE_STORAGE_BY_REQUEST="${INITIALIZE_STORAGE_BY_REQUEST:-false}"
-PROMETHEUS_URI="${PROMETHEUS_URI:-http://0.0.0.0:9090/metrics}"
-JVM_METRICS_ENABLED="${JVM_METRICS_ENABLED:-false}"
-PUBLISH_NODE_PIPELINE_EXECUTION_TIME="${PUBLISH_NODE_PIPELINE_EXECUTION_TIME:-false}"
-PUBLISH_STORAGE_ANALYTICS="${PUBLISH_STORAGE_ANALYTICS:-false}"
+# App-level params (do not set defaults here — add only if provided)
+GRAPH_CALCULATION_CRON_CYCLE="${GRAPH_CALCULATION_CRON_CYCLE-}"
+INITIALIZE_STORAGE_BY_REQUEST="${INITIALIZE_STORAGE_BY_REQUEST-}"
+PROMETHEUS_URI="${PROMETHEUS_URI-}"
+JVM_METRICS_ENABLED="${JVM_METRICS_ENABLED-}"
+PUBLISH_NODE_PIPELINE_EXECUTION_TIME="${PUBLISH_NODE_PIPELINE_EXECUTION_TIME-}"
+PUBLISH_STORAGE_ANALYTICS="${PUBLISH_STORAGE_ANALYTICS-}"
+PROJECT_NAME="${PROJECT_NAME-}"
+CONFIG_PATH="${CONFIG_PATH-}"
+DATA_DIRECTORY="${DATA_DIRECTORY-}"
 
 JAVA_OPTS=(
   -server
   -Xms"${XMS:-512m}"
   -Xmx"${XMX:-1024m}"
-  -DgraphCalculationCronCycle="${GRAPH_CALCULATION_CRON_CYCLE}"
-  -DinitializeStorageByRequest="${INITIALIZE_STORAGE_BY_REQUEST}"
-  -DprometheusURI="${PROMETHEUS_URI}"
-  -DjvmMetricsEnabled="${JVM_METRICS_ENABLED}"
-  -DpublishNodePipelineExecutionTime="${PUBLISH_NODE_PIPELINE_EXECUTION_TIME}"
-  -DpublishStorageAnalytics="${PUBLISH_STORAGE_ANALYTICS}"
 )
+
+APP_PID=""
+
+add_sysprop_if_set() {
+  local prop_name="$1"
+  local prop_value="${2:-}"
+  if [[ -n "$prop_value" ]]; then
+    JAVA_OPTS+=("-D${prop_name}=${prop_value}")
+  fi
+}
+
+build_java_opts() {
+  add_sysprop_if_set "configFilePath" "${CONFIG_PATH}"
+  add_sysprop_if_set "dataDirectory" "${DATA_DIRECTORY}"
+  add_sysprop_if_set "projectName" "${PROJECT_NAME}"
+  add_sysprop_if_set "graphCalculationCronCycle" "${GRAPH_CALCULATION_CRON_CYCLE}"
+  add_sysprop_if_set "initializeStorageByRequest" "${INITIALIZE_STORAGE_BY_REQUEST}"
+  add_sysprop_if_set "prometheusURI" "${PROMETHEUS_URI}"
+  add_sysprop_if_set "jvmMetricsEnabled" "${JVM_METRICS_ENABLED}"
+  add_sysprop_if_set "publishNodePipelineExecutionTime" "${PUBLISH_NODE_PIPELINE_EXECUTION_TIME}"
+  add_sysprop_if_set "publishStorageAnalytics" "${PUBLISH_STORAGE_ANALYTICS}"
+}
 
 calc_hash() {
   {
@@ -49,6 +70,7 @@ unzip_all_zips() {
   mkdir -p "$target_dir"
 
   find "$source_dir" -maxdepth 1 -type f -name '*.zip' -print0 | while IFS= read -r -d '' zipfile; do
+    local zip_name folder_name extract_path
     zip_name="$(basename "$zipfile")"
     folder_name="${zip_name%.zip}"
     extract_path="$target_dir/$folder_name"
@@ -66,7 +88,6 @@ stop_app() {
     echo "[INFO] Stopping app pid=$pid (SIGTERM)"
     kill "$pid" 2>/dev/null || true
 
-    # ждём до 15 секунд
     for _ in {1..15}; do
       kill -0 "$pid" 2>/dev/null || return 0
       sleep 1
@@ -77,41 +98,62 @@ stop_app() {
   fi
 }
 
-run_app() {
-  unzip_all_zips "$SOURCE_ZIP_DIR" "$PROJECTS_DIR"
+run_app_background() {
   java "${JAVA_OPTS[@]}" -jar "$JAR_PATH" &
   APP_PID=$!
   echo "[INFO] Started app pid=$APP_PID"
 }
 
+run_app_foreground() {
+  echo "[INFO] Starting app in foreground (watch disabled)"
+  exec java "${JAVA_OPTS[@]}" -jar "$JAR_PATH"
+}
+
+watch_loop() {
+  echo "[INFO] Watch enabled. Watching: ${WATCH_DIRS[*]}"
+  local current_hash new_hash tick elapsed
+  current_hash="$(calc_hash)"
+  tick=1
+  elapsed=0
+
+  run_app_background
+
+  while true; do
+    if [[ -n "${APP_PID:-}" ]] && ! kill -0 "$APP_PID" 2>/dev/null; then
+      echo "[ERROR] App pid=$APP_PID exited. Exiting."
+      exit 1
+    fi
+
+    sleep "$tick"
+    elapsed=$((elapsed + tick))
+
+    if (( elapsed >= DATA_DIR_WATCH_INTERVAL )); then
+      elapsed=0
+      new_hash="$(calc_hash)"
+      if [[ "$new_hash" != "$current_hash" ]]; then
+        echo "[INFO] Changes detected, restarting app..."
+        current_hash="$new_hash"
+        stop_app "${APP_PID:-}"
+        unzip_all_zips "$SOURCE_ZIP_DIR" "$PROJECTS_DIR"
+        run_app_background
+      fi
+    fi
+  done
+}
+
+main() {
+  echo "[INFO] Startup"
+  build_java_opts
+
+  unzip_all_zips "$SOURCE_ZIP_DIR" "$PROJECTS_DIR"
+
+  if [[ "${IS_ENABLE_WATCH,,}" == "true" ]]; then
+    watch_loop
+  else
+    run_app_foreground
+  fi
+}
+
 trap 'stop_app "${APP_PID:-}"; exit 0' SIGTERM SIGINT
 
-echo "[INFO] Startup, watching: ${WATCH_DIRS[*]}"
-current_hash="$(calc_hash)"
-run_app
-
-tick=1
-elapsed=0
-
-while true; do
-  # JVM умерла → контейнер падает
-  if [[ -n "${APP_PID:-}" ]] && ! kill -0 "$APP_PID" 2>/dev/null; then
-    echo "[ERROR] App pid=$APP_PID exited. Exiting."
-    exit 1
-  fi
-
-  sleep "$tick"
-  elapsed=$((elapsed + tick))
-
-  # пора делать hash-check
-  if (( elapsed >= DATA_DIR_WATCH_INTERVAL )); then
-    elapsed=0
-    new_hash="$(calc_hash)"
-    if [[ "$new_hash" != "$current_hash" ]]; then
-      echo "[INFO] Changes detected, restarting app..."
-      current_hash="$new_hash"
-      stop_app "${APP_PID:-}"
-      run_app
-    fi
-  fi
-done
+main "$@"

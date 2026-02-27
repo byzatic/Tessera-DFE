@@ -11,13 +11,13 @@ services:
       - $PWD/data/source/:/app/data/source_zip
       - $PWD/logs/:/app/logs/
     environment:
-      - GRAPH_CALCULATION_CRON_CYCLE=*/10 * * * * *
+      - PROJECT_NAME=MyAwesomeProject
+      - GRAPH_CALCULATION_CRON_CYCLE=*/30 * * * * *
       - PROMETHEUS_URI=http://0.0.0.0:9090/metrics
-      - JVM_METRICS_ENABLED=False
-      - PUBLISH_NODE_PIPELINE_EXECUTION_TIME=False
+      - JVM_METRICS_ENABLED=True
       - XMS=512m
       - XMX=6144m
-      - DATA_DIR_WATCH_INTERVAL=5
+      - DATA_DIR_WATCH_INTERVAL=50
     logging:
       driver: json-file
       options:
