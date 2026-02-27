@@ -73,6 +73,7 @@ public class Configuration {
     public static final URI PROMETHEUS_URI;
     public static final Boolean JVM_METRICS_ENABLED;
     public static final Boolean PUBLISH_NODE_PIPELINE_EXECUTION_TIME;
+    public static final Boolean PUBLISH_STORAGE_ANALYTICS;
 
     private static Path initConfigFilePath() throws ConfigurationException {
         Path result;
@@ -287,6 +288,30 @@ public class Configuration {
         return result;
     }
 
+    //initPublishStorageAnalytics
+
+    private static Boolean initPublishStorageAnalytics(XMLConfiguration config) throws ConfigurationException {
+        Boolean result;
+        Boolean propertyPublishStorageAnalytics = (System.getProperty("publishStorageAnalytics", null) != null) ? Boolean.valueOf(System.getProperty("publishStorageAnalytics")) : null;
+        Boolean configPublishStorageAnalytics = (config.getString("publishStorageAnalytics") != null) ? Boolean.valueOf(config.getString("publishStorageAnalytics")) : null;
+        Boolean defaultPublishStorageAnalytics = Boolean.FALSE;
+
+        if (propertyPublishStorageAnalytics != null) {
+            // TODO: some checks for URI
+            result = propertyPublishStorageAnalytics;
+            logger.debug("(property) PUBLISH_STORAGE_ANALYTICS = {}", propertyPublishStorageAnalytics);
+        } else if (configPublishStorageAnalytics != null) {
+            // TODO: some checks for URI
+            result = configPublishStorageAnalytics;
+            logger.debug("(config) PUBLISH_STORAGE_ANALYTICS = {}", configPublishStorageAnalytics);
+        } else {
+            // TODO: some checks for URI
+            result = defaultPublishStorageAnalytics;
+            logger.debug("(default) PUBLISH_STORAGE_ANALYTICS = {}", defaultPublishStorageAnalytics);
+        }
+        return result;
+    }
+
     public static String readSpecificationVersion() {
         String version = "UNDEFINED";
         String packageVersion = Configuration.class.getPackage().getSpecificationVersion();;
@@ -357,6 +382,8 @@ public class Configuration {
             JVM_METRICS_ENABLED = initJvmMetricsEnabled(config);
 
             PUBLISH_NODE_PIPELINE_EXECUTION_TIME = initPublishNodePipelineExecutionTime(config);
+
+            PUBLISH_STORAGE_ANALYTICS = initPublishStorageAnalytics(config);
 
             logger.debug("Configuration complete.");
         } catch (ConfigurationException ce) {

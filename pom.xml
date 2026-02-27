@@ -5,7 +5,7 @@
   <groupId>io.github.byzatic.tessera</groupId>
   <artifactId>tessera-dfe</artifactId>
   <!--<version>0.1.3-SNAPSHOT</version>-->
-  <version>0.1.3</version>
+  <version>0.1.4</version>
   <packaging>jar</packaging>
 
   <name>Tessera-DFE</name>
@@ -19,7 +19,7 @@
     <fully.qualified.main.class>${project.groupId}.engine.App</fully.qualified.main.class>
     <!-- manual versions -->
     <version.slf4j>2.0.17</version.slf4j>
-    <version.logback>1.5.18</version.logback>
+    <version.logback>1.5.25</version.logback>
     <version.junit>4.13.1</version.junit>
     <version.prometheus_metrics>1.5.0</version.prometheus_metrics>
     <version.java_byzatic_commons>0.0.6</version.java_byzatic_commons>

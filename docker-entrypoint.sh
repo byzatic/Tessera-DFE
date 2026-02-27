@@ -1,113 +1,159 @@
 #!/usr/bin/env bash
-#
-#
-#
+set -euo pipefail
 
-set -e
-set -u
-
-# CONFIG_PATH from the environment variables (set in the project Dockerfile)
 CONFIG_DIR_PATH="/app/configurations"
 SOURCE_ZIP_DIR="/app/data/source_zip"
 PROJECTS_DIR="/app/data/projects"
 
 WATCH_DIRS=("${SOURCE_ZIP_DIR}" "${CONFIG_DIR_PATH}")
-# DATA_DIR_WATCH_INTERVAL - means run once every 60 seconds by default
 DATA_DIR_WATCH_INTERVAL="${DATA_DIR_WATCH_INTERVAL:-60}"
+IS_ENABLE_WATCH="${IS_ENABLE_WATCH:-True}"   # Default = True
 
 JAR_PATH="/app/app.jar"
+
+# App-level params (do not set defaults here — add only if provided)
+GRAPH_CALCULATION_CRON_CYCLE="${GRAPH_CALCULATION_CRON_CYCLE-}"
+INITIALIZE_STORAGE_BY_REQUEST="${INITIALIZE_STORAGE_BY_REQUEST-}"
+PROMETHEUS_URI="${PROMETHEUS_URI-}"
+JVM_METRICS_ENABLED="${JVM_METRICS_ENABLED-}"
+PUBLISH_NODE_PIPELINE_EXECUTION_TIME="${PUBLISH_NODE_PIPELINE_EXECUTION_TIME-}"
+PUBLISH_STORAGE_ANALYTICS="${PUBLISH_STORAGE_ANALYTICS-}"
+PROJECT_NAME="${PROJECT_NAME-}"
+CONFIG_PATH="${CONFIG_PATH-}"
+DATA_DIRECTORY="${DATA_DIRECTORY-}"
+
 JAVA_OPTS=(
   -server
   -Xms"${XMS:-512m}"
   -Xmx"${XMX:-1024m}"
-  # TODO: Exception : org.apache.commons.configuration2.ex.ConfigurationException: Property dataDirectory not exists. (default value is incorrect by quoting)
-  # -DdataDirectory="${DATA_DIRECTORY:-'/app/data'}"
-  # TODO: ${GRAPH_CALCULATION_CRON_CYCLE:-'*/10 * * * * ?'} default value is incorrect by quoting
-  -DgraphCalculationCronCycle="${GRAPH_CALCULATION_CRON_CYCLE:-'*/10 * * * * *'}"
-  # TODO: ${INITIALIZE_STORAGE_BY_REQUEST:-'false'} default value is incorrect by quoting
-  -DinitializeStorageByRequest="${INITIALIZE_STORAGE_BY_REQUEST:-'false'}"
-  -DprometheusURI="${PROMETHEUS_URI:-'http://0.0.0.0:9090/metrics'}"
-  -DjvmMetricsEnabled="${JVM_METRICS_ENABLED:-'False'}"
-  -DpublishNodePipelineExecutionTime="${PUBLISH_NODE_PIPELINE_EXECUTION_TIME:-'False'}"
-  # TODO: There is no -DsharedPath arg and EmptyValueDefaults check in engine
-  #-DprojectName="${DATA_DIRECTORY:-'SomeTestProject'}"
-  #-DservicesPath="${DATA_DIRECTORY:-'/app/data/services'}"
-  #-DworkflowRoutinesPath="${DATA_DIRECTORY:-'/app/data/workflow_routines'}"
 )
 
-echo "[INFO] Startup, watching ${WATCH_DIRS[@]}"
-echo "[INFO] external args> ${*}"
+APP_PID=""
 
-# Calculate a hash for all files in the watched directory
-calc_hash() {
-    find "${WATCH_DIRS[@]}" -type f -exec sha256sum {} \; | sort | sha256sum | awk '{print $1}'
+add_sysprop_if_set() {
+  local prop_name="$1"
+  local prop_value="${2:-}"
+  if [[ -n "$prop_value" ]]; then
+    JAVA_OPTS+=("-D${prop_name}=${prop_value}")
+  fi
 }
 
-# unzip all zips
-# TODO: migrate to engine
+build_java_opts() {
+  add_sysprop_if_set "configFilePath" "${CONFIG_PATH}"
+  add_sysprop_if_set "dataDirectory" "${DATA_DIRECTORY}"
+  add_sysprop_if_set "projectName" "${PROJECT_NAME}"
+  add_sysprop_if_set "graphCalculationCronCycle" "${GRAPH_CALCULATION_CRON_CYCLE}"
+  add_sysprop_if_set "initializeStorageByRequest" "${INITIALIZE_STORAGE_BY_REQUEST}"
+  add_sysprop_if_set "prometheusURI" "${PROMETHEUS_URI}"
+  add_sysprop_if_set "jvmMetricsEnabled" "${JVM_METRICS_ENABLED}"
+  add_sysprop_if_set "publishNodePipelineExecutionTime" "${PUBLISH_NODE_PIPELINE_EXECUTION_TIME}"
+  add_sysprop_if_set "publishStorageAnalytics" "${PUBLISH_STORAGE_ANALYTICS}"
+}
+
+calc_hash() {
+  {
+    for d in "${WATCH_DIRS[@]}"; do
+      [[ -d "$d" ]] || continue
+      find "$d" -type f -print0
+    done \
+    | sort -z \
+    | xargs -0 sha256sum 2>/dev/null \
+    | sha256sum \
+    | awk '{print $1}'
+  } || echo "NOHASH"
+}
+
 unzip_all_zips() {
   local source_dir="$1"
   local target_dir="$2"
+  [[ -d "$source_dir" ]] || { echo "[INFO] no source dir: $source_dir"; return 0; }
+  mkdir -p "$target_dir"
 
-  # [INFO] Check if source directory exists
-  if [[ ! -d "$source_dir" ]]; then
-    echo "[INFO] Source directory does not exist: $source_dir"
-    return 1
-  fi
-
-  # [INFO] Create target directory if it doesn't exist
-  if [[ ! -d "$target_dir" ]]; then
-    echo "[INFO] Target directory does not exist. Creating: $target_dir"
-    mkdir -p "$target_dir"
-  fi
-
-  # [INFO] Find all .zip files in the source directory (non-recursively)
-  echo "[INFO] Searching for .zip files in: $source_dir"
-  find "$source_dir" -maxdepth 1 -type f -name '*.zip' | while read -r zipfile; do
+  find "$source_dir" -maxdepth 1 -type f -name '*.zip' -print0 | while IFS= read -r -d '' zipfile; do
+    local zip_name folder_name extract_path
     zip_name="$(basename "$zipfile")"
     folder_name="${zip_name%.zip}"
     extract_path="$target_dir/$folder_name"
-
-    # [INFO] Remove existing extraction folder if it exists
-    if [[ -d "$extract_path" ]]; then
-      echo "[INFO] Removing existing folder: $extract_path"
-      rm -rf "$extract_path"
-    fi
-
-    # [INFO] Create extraction folder
+    rm -rf "$extract_path"
     mkdir -p "$extract_path"
-
-    # [INFO] Extract archive into target subdirectory
     echo "[INFO] Extracting $zipfile → $extract_path"
     unzip -q "$zipfile" -d "$extract_path"
   done
-
-  echo "[INFO] All ZIP files extracted."
 }
 
-# running application
-run() {
-    unzip_all_zips ${SOURCE_ZIP_DIR} ${PROJECTS_DIR}
-    java "${JAVA_OPTS[@]}" -jar "$JAR_PATH" &
-    APP_PID=$!
-    echo "[INFO] Started app with pid $APP_PID"
+stop_app() {
+  local pid="$1"
+  [[ -n "${pid:-}" ]] || return 0
+  if kill -0 "$pid" 2>/dev/null; then
+    echo "[INFO] Stopping app pid=$pid (SIGTERM)"
+    kill "$pid" 2>/dev/null || true
+
+    for _ in {1..15}; do
+      kill -0 "$pid" 2>/dev/null || return 0
+      sleep 1
+    done
+
+    echo "[WARN] App did not stop in time, SIGKILL pid=$pid"
+    kill -9 "$pid" 2>/dev/null || true
+  fi
 }
 
-current_hash=$(calc_hash)
+run_app_background() {
+  java "${JAVA_OPTS[@]}" -jar "$JAR_PATH" &
+  APP_PID=$!
+  echo "[INFO] Started app pid=$APP_PID"
+}
 
-# run app
-run
+run_app_foreground() {
+  echo "[INFO] Starting app in foreground (watch disabled)"
+  exec java "${JAVA_OPTS[@]}" -jar "$JAR_PATH"
+}
 
-while true; do
-    new_hash=$(calc_hash)
+watch_loop() {
+  echo "[INFO] Watch enabled. Watching: ${WATCH_DIRS[*]}"
+  local current_hash new_hash tick elapsed
+  current_hash="$(calc_hash)"
+  tick=1
+  elapsed=0
 
-    if [[ "$new_hash" != "$current_hash" ]]; then
-        echo "[INFO] Detected changes in ${WATCH_DIRS[@]}, restarting app..."
-        current_hash="$new_hash"
-        kill "$APP_PID"
-        wait "$APP_PID" 2>/dev/null || true
-        run
+  run_app_background
+
+  while true; do
+    if [[ -n "${APP_PID:-}" ]] && ! kill -0 "$APP_PID" 2>/dev/null; then
+      echo "[ERROR] App pid=$APP_PID exited. Exiting."
+      exit 1
     fi
 
-    sleep "$DATA_DIR_WATCH_INTERVAL"
-done
+    sleep "$tick"
+    elapsed=$((elapsed + tick))
+
+    if (( elapsed >= DATA_DIR_WATCH_INTERVAL )); then
+      elapsed=0
+      new_hash="$(calc_hash)"
+      if [[ "$new_hash" != "$current_hash" ]]; then
+        echo "[INFO] Changes detected, restarting app..."
+        current_hash="$new_hash"
+        stop_app "${APP_PID:-}"
+        unzip_all_zips "$SOURCE_ZIP_DIR" "$PROJECTS_DIR"
+        run_app_background
+      fi
+    fi
+  done
+}
+
+main() {
+  echo "[INFO] Startup"
+  build_java_opts
+
+  unzip_all_zips "$SOURCE_ZIP_DIR" "$PROJECTS_DIR"
+
+  if [[ "${IS_ENABLE_WATCH,,}" == "true" ]]; then
+    watch_loop
+  else
+    run_app_foreground
+  fi
+}
+
+trap 'stop_app "${APP_PID:-}"; exit 0' SIGTERM SIGINT
+
+main "$@"

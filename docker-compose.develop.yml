@@ -15,16 +15,19 @@ services:
       - $PWD/logs/:/app/logs/
       - $PWD/flight_recording/:/tmp/flight_recording/
     environment:
-      - GRAPH_CALCULATION_CRON_CYCLE=0 */5 * * * *
+      - PROJECT_NAME=MyAwesomeProject
+      - GRAPH_CALCULATION_CRON_CYCLE=*/30 * * * * *
       - PROMETHEUS_URI=http://0.0.0.0:9090/metrics
       - JVM_METRICS_ENABLED=True
-      - PUBLISH_NODE_PIPELINE_EXECUTION_TIME=True
+      - PUBLISH_NODE_PIPELINE_EXECUTION_TIME=False
+      - PUBLISH_STORAGE_ANALYTICS=False
       - XMS=512m
       - XMX=6144m
-      # Production JAVA_TOOL_OPTIONS
+      # Production Flight Recording
       #- JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,dumponexit=true,maxsize=512m,maxage=1h,delay=348s
-      # Develop JAVA_TOOL_OPTIONS
-      - JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,duration=300s,delay=400s
+      # Develop Flight Recording
+      - JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,duration=300s,delay=400s,ParallelGCThreads=2
+      - IS_ENABLE_WATCH=False
       - DATA_DIR_WATCH_INTERVAL=500
     logging:
       driver: json-file
