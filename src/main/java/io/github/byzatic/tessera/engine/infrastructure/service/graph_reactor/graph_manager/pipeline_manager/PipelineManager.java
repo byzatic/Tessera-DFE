@@ -1,6 +1,8 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager;
 
 import io.github.byzatic.commons.schedulers.immediate.*;
+import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
+import io.github.byzatic.lib.configio.domain.exception.PluginLoadingException;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
@@ -13,7 +15,6 @@ import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gra
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.MCg3WorkflowRoutineApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.StorageApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context.ExecutionContextFactoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoaderInterface;
 import io.github.byzatic.tessera.workflowroutine.configuration.ConfigurationParameter;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
@@ -331,6 +332,11 @@ public class PipelineManager implements PipelineManagerInterface {
                     }
                 }
 
+            } catch (PluginLoadingException exception) {
+                throw new OperationIncompleteException(
+                        "Cannot load workflow routine for stage " + stage.getStageId(),
+                        exception
+                );
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 throw new OperationIncompleteException("Interrupted while waiting stage " + stage.getStageId(), ie);

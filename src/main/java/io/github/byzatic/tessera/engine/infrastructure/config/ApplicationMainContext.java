@@ -1,5 +1,9 @@
 package io.github.byzatic.tessera.engine.infrastructure.config;
 
+import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
+import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
+import io.github.byzatic.lib.configio.infrastructure.factory.ModuleLoaderFactory;
+import io.github.byzatic.lib.configio.infrastructure.factory.ServiceLoaderFactory;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationService;
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceInterface;
@@ -28,11 +32,7 @@ import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gra
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context.ExecutionContextFactory;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context.ExecutionContextFactoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoader;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoaderInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.ServicesManagerFactory;
-import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_loader.ServiceLoader;
-import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_loader.ServiceLoaderInterface;
 
 public class ApplicationMainContext {
     private static OrchestrationServiceInterface orchestrationServiceInterface = null;
@@ -83,9 +83,9 @@ public class ApplicationMainContext {
     public static ServiceLoaderInterface getServiceLoader() {
         try {
             if (serviceLoader == null) {
-                serviceLoader = new ServiceLoader(
+                serviceLoader = ServiceLoaderFactory.create(
                         Configuration.PROJECT_SERVICES_PATH,
-                        getProjectRepository()
+                        getProjectRepository().getSharedResourcesClassLoader()
                 );
             }
             return serviceLoader;
@@ -166,9 +166,9 @@ public class ApplicationMainContext {
     public static ModuleLoaderInterface getModuleLoader() {
         try {
             if (moduleLoader == null) {
-                moduleLoader = new ModuleLoader(
+                moduleLoader = ModuleLoaderFactory.create(
                         Configuration.PROJECT_WORKFLOW_ROUTINES_PATH,
-                        getProjectRepository()
+                        getProjectRepository().getSharedResourcesClassLoader()
                 );
             }
             return moduleLoader;
