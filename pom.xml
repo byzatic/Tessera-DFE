@@ -24,12 +24,19 @@
     <version.prometheus_metrics>1.5.0</version.prometheus_metrics>
     <version.java_byzatic_commons>0.0.6</version.java_byzatic_commons>
     <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
+    <version.lib_tessera_dfe_config_io>feature-develop-initial-SNAPSHOT</version.lib_tessera_dfe_config_io>
     <!-- manual versions end -->
   </properties>
   <!-- manual set end -->
 
   <!-- manual set -->
   <dependencies>
+
+    <dependency>
+      <groupId>com.github.byzatic</groupId>
+      <artifactId>lib-tessera-dfe-config-io</artifactId>
+      <version>${version.lib_tessera_dfe_config_io}</version>
+    </dependency>
 
     <!-- included in tessera-workflow-toolkit -->
     <!-- https://central.sonatype.com/artifact/io.github.byzatic/tessera-enginecommon-lib -->
@@ -182,6 +189,13 @@
 
   </dependencies>
   <!-- manual set end -->
+
+  <repositories>
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+    </repository>
+  </repositories>
 
   <!-- manual set -->
   <build>
@@ -376,4 +390,3 @@
 
   <!-- jpa_like_project_global_repository end -->
 </project>
-

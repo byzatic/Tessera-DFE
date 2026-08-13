@@ -197,14 +197,6 @@ public class ApplicationMainContext {
                 fullProjectRepository = new ProjectRepositoryImpl(
                         Configuration.PROJECT_NAME
                 );
-                fullProjectRepository.addProjectLoader(ProjectRepository.ProjectLoaderTypes.PLV1, new ProjectV1Loader(
-                                getNodeGlobalDao(),
-                                getPipelineDao(),
-                                getProjectDao(),
-                                getProjectGlobalDao(),
-                                getSharedResourcesDAO()
-                        )
-                );
                 fullProjectRepository.load();
             }
             return fullProjectRepository;
