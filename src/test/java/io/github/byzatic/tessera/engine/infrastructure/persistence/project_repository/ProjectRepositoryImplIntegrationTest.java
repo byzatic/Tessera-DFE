@@ -1,18 +1,28 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository;
 
+import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import org.junit.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assume.assumeTrue;
 
 public class ProjectRepositoryImplIntegrationTest {
 
     @Test
     public void shouldPreserveRepositoryContractWhenLoadingThroughConfigIoLibrary()
             throws Exception {
+        Path projectDirectory = Configuration.PROJECTS_DIR.resolve("MyAwesomeProject");
+        assumeTrue(
+                "Integration project is not available: " + projectDirectory,
+                Files.isDirectory(projectDirectory)
+        );
+
         ProjectRepositoryImpl repository = new ProjectRepositoryImpl("MyAwesomeProject");
 
         repository.load();

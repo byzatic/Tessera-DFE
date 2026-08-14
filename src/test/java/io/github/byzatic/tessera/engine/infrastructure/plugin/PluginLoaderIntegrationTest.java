@@ -9,14 +9,26 @@ import io.github.byzatic.tessera.engine.domain.repository.ProjectRepository;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectRepositoryImpl;
 import org.junit.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 public class PluginLoaderIntegrationTest {
 
     @Test
     public void shouldDiscoverProjectModulesAndServicesThroughConfigIoLibrary()
             throws Exception {
+        Path projectDirectory = Configuration.PROJECTS_DIR.resolve(
+                Configuration.PROJECT_NAME
+        );
+        assumeTrue(
+                "Integration project is not available: " + projectDirectory,
+                Files.isDirectory(projectDirectory)
+        );
+
         ProjectRepository projectRepository = new ProjectRepositoryImpl(
                 Configuration.PROJECT_NAME
         );
