@@ -4,8 +4,8 @@
 
   <groupId>io.github.byzatic.tessera</groupId>
   <artifactId>tessera-dfe</artifactId>
-  <!--<version>0.1.3-SNAPSHOT</version>-->
-  <version>0.1.4</version>
+  <!--<version>0.1.5-SNAPSHOT</version>-->
+  <version>0.1.5</version>
   <packaging>jar</packaging>
 
   <name>Tessera-DFE</name>
