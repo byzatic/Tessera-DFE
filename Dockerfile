@@ -26,9 +26,9 @@ RUN mkdir -p /temp_1/logs
 # Step 2: Use a JRE image to run the application
 FROM --platform=linux/amd64 docker.io/eclipse-temurin:17-jre-jammy
 
-# Install bash unzip no cashe
+# Install bash for the environment-to-JVM entrypoint.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends bash unzip && \
+    apt-get install -y --no-install-recommends bash && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

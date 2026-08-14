@@ -300,6 +300,26 @@ public class StorageManager implements StorageManagerInterface {
         }
     }
 
+    @Override
+    public void cleanupStorages() throws OperationIncompleteException {
+        try {
+            for (StorageInterface<DataValueInterface> storage : globalStorageMap.values()) {
+                storage.cleanup();
+            }
+            for (Map<String, StorageInterface<DataValueInterface>> nodeStorages : nodeStorageMap.values()) {
+                for (StorageInterface<DataValueInterface> storage : nodeStorages.values()) {
+                    storage.cleanup();
+                }
+            }
+            globalStorageMap.clear();
+            nodeStorageMap.clear();
+        } finally {
+            if (Configuration.PUBLISH_STORAGE_ANALYTICS) {
+                publishStorageMetricsSafe();
+            }
+        }
+    }
+
     /**
      * Best-effort publish storage metrics snapshot.
      * Metrics must never break storage operations.

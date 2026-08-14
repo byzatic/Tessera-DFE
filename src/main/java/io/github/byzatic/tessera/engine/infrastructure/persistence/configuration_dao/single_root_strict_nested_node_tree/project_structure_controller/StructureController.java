@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
+import java.util.Objects;
 
 public class StructureController implements StructureControllerInterface {
     private final static Logger logger = LoggerFactory.getLogger(StructureController.class);
@@ -16,6 +17,18 @@ public class StructureController implements StructureControllerInterface {
     public StructureController(String projectName) {
         //TODO: check if exists
         this.projectsDirectory = Configuration.PROJECTS_DIR.resolve(projectName);
+    }
+
+    /**
+     * Creates a controller for an isolated project revision directory.
+     *
+     * @param projectDirectory extracted project root
+     */
+    public StructureController(Path projectDirectory) {
+        this.projectsDirectory = Objects.requireNonNull(
+                projectDirectory,
+                "projectDirectory"
+        ).toAbsolutePath().normalize();
     }
 
     @Override

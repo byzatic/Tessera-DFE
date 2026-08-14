@@ -132,16 +132,14 @@ Use `"*/10 * * * * *"` to run every 10 seconds.
 
 ### Parameter: dataDirectory
 
-Directory where application data are stored
-The directory where projects are stored is <dataDirectory>/projects.
+Directory where application data are stored. The selected project archive must be placed at
+`<dataDirectory>/source_zip/<projectName>.zip`.
 
-In the current version, only the Docker build can read a project from a `.zip` file.  
 The directory for `.zip` files inside the container is:
 
 `/app/data/source_zip`
 
-In Docker, mount your `.zip` project directory to `/app/data/source_zip`.  
-The source build requires explicit declaration of the directory.
+In Docker, mount your `.zip` project directory to `/app/data/source_zip`.
 
 | Source | Value |
 |--------|-------|
@@ -156,8 +154,7 @@ The source build requires explicit declaration of the directory.
 
 Project name.
 
-In Docker, this is the `.zip` archive name.  
-In source mode, this is the project directory name.
+This is the `.zip` archive name without the `.zip` extension in both Docker and source modes.
 
 | Source | Value |
 |--------|-------|
@@ -244,36 +241,19 @@ Publishes metric for the number of items stored in storages. Recommended only fo
 
 
 
-### Parameter: DATA_DIR_WATCH_INTERVAL (Docker Only)
+### Project reload parameters
 
-Defines the polling interval (in seconds) for monitoring the directory containing `.zip` project files.  
-If a `.zip` file changes, the engine will restart automatically with the updated project (**cold reload**).
+The engine watches `<dataDirectory>/source_zip/<projectName>.zip` inside the JVM. A stable
+archive is copied to an isolated temporary directory, validated, and loaded before the
+active project is stopped. Project services, graph schedulers, plugin loaders, and class
+loaders are then replaced without restarting the JVM. A failed activation triggers rollback
+to the previous loaded revision.
 
-| Source | Value |
-|--------|-------|
-| Docker Environment | `DATA_DIR_WATCH_INTERVAL=50` |
-| Java VM Options | Not available outside Docker |
-| Configuration File | Not available outside Docker |
-| Default | Not available outside Docker |
-
-
-
-### Parameter: IS_ENABLE_WATCH  (Docker Only)
-
-Enables or disables directory watching for .zip project files.
-
-If set to True, the engine monitors the project and configuration directories.
-When a .zip file changes, the engine performs a cold reload (stops the current JVM and starts it again with the updated project).
-
-If set to False, directory watching is disabled.
-The engine extracts .zip files once at startup and runs the application without restart logic.
-
-| Source | Value                  |
-|--------|------------------------|
-| Docker Environment | `IS_ENABLE_WATCH=True` |
-| Java VM Options | `Not supported`        |
-| Configuration File | `Not supported`        |
-| Default | True                   |
+| Environment | Java VM option | Default |
+|-------------|----------------|---------|
+| `PROJECT_WATCH_INTERVAL_SECONDS` | `-DprojectWatchIntervalSeconds=1` | `1` |
+| `PROJECT_STARTUP_TIMEOUT_SECONDS` | `-DprojectStartupTimeoutSeconds=60` | `60` |
+| `PROJECT_SHUTDOWN_TIMEOUT_SECONDS` | `-DprojectShutdownTimeoutSeconds=180` | `180` |
 
 
 
@@ -313,7 +293,7 @@ Before starting, ensure that Docker and Docker Compose (or Docker Compose v2) ar
 
 The container expects a specific directory structure on the host. The `./configurations/` directory must contain the `configuration.xml` file. At runtime, this directory is mounted into the container at `/app/configurations/`, and the engine reads its configuration from `/app/configurations/configuration.xml`. The file name must be exactly `configuration.xml`, as the engine resolves it by convention unless explicitly overridden.
 
-Project artifacts are provided as `.zip` archives. These archives must be placed into `./data/source/` on the host. This directory is mounted into the container as `/app/data/source_zip`. At startup, the entrypoint script extracts all `.zip` files into the internal projects directory and then launches the JVM. In production-like mode, directory watching can be enabled so that if any `.zip` file changes, the engine performs a cold reload: the current JVM process is stopped and restarted with the updated project.
+Project artifacts are provided as `.zip` archives. These archives must be placed into `./data/source/` on the host. This directory is mounted into the container as `/app/data/source_zip`. The JVM watches the archive selected by `PROJECT_NAME`, prepares changed revisions in an isolated temporary directory, and replaces the project runtime without restarting the process.
 
 Logs are written into `./logs/`, which is mounted into the container as `/app/logs/`. Docker log rotation is configured in the compose files using the `json-file` driver with size and file count limits to prevent uncontrolled log growth.
 
@@ -339,7 +319,7 @@ To stop the environment and remove associated containers, volumes, and images:
 
 In development mode, the system uses `docker-compose.develop.yml`. Instead of pulling a prebuilt image, it builds the image locally from the provided Dockerfile and tags it as `develop`. This mode also mounts an additional directory `./flight_recording/` into `/tmp/flight_recording/` inside the container and enables Java Flight Recorder (JFR) through `JAVA_TOOL_OPTIONS`. This allows deeper runtime diagnostics and performance analysis.
 
-In development mode, directory watching is typically disabled (`IS_ENABLE_WATCH=False`), meaning the engine extracts `.zip` projects only once at startup and does not monitor for changes. If project sources or configuration are modified, the container must be restarted manually.
+Development mode uses the same in-process project revision watcher as production mode. Replacing the selected ZIP archive triggers project runtime reload without rebuilding or restarting the container.
 
 To build the development image:
 
@@ -367,11 +347,11 @@ To shut down the development environment:
 
 Runtime behavior is primarily controlled through environment variables defined in the compose files. These variables are translated into JVM system properties inside the container. If a variable is not defined, the corresponding `-D` option is not added to the JVM command line. Heap configuration is controlled using `XMS` and `XMX`, which map to `-Xms` and `-Xmx`. The maximum heap size must be chosen carefully based on available container memory to avoid out-of-memory conditions or aggressive garbage collection.
 
-When directory watching is enabled (`IS_ENABLE_WATCH=True`), the entrypoint script periodically calculates a hash of the project and configuration directories. If any change is detected, it stops the running JVM gracefully, re-extracts project archives, and starts a new JVM process. This mechanism provides a controlled cold reload without rebuilding the Docker image.
+The entrypoint only translates environment variables into JVM system properties. ZIP observation, staging, validation, project shutdown, activation, and rollback are implemented inside the application with `lib-tessera-dfe-config-io`.
 
 From an operational perspective, production-like mode is recommended when running stable project configurations where hot reloading via directory watch is required. Development mode is recommended when actively modifying engine code, experimenting with JVM parameters, or collecting diagnostic data using JFR.
 
-The overall execution model in Docker is deterministic: configuration is mounted, projects are extracted, JVM options are assembled from environment variables, and the engine starts either in watch mode (with automatic restarts) or in single-run mode (foreground execution). Proper separation of configuration, project artifacts, and runtime logs ensures that the container remains stateless while all operational data persists on the host.
+The Docker process remains stable while project runtime sessions are replaced inside the JVM. Proper separation of configuration, project artifacts, temporary revisions, and logs keeps project activation deterministic and allows rollback after a failed update.
 
 
 ## Build Tessera-DFE from Source
@@ -461,7 +441,7 @@ When you run the engine without Docker, you typically control configuration usin
 A common local layout is:
 
 - `./configurations/configuration.xml`
-- `./data/` (projects directory; source mode usually expects projects as directories rather than zipped archives)
+- `./data/source_zip/MyAwesomeProject.zip`
 
 #### Running the assembly fat JAR
 

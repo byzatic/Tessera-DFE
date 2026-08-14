@@ -204,9 +204,15 @@ public final class PrometheusMetricsAgent {
     }
 
     public void stop() {
-        if (server != null) {
-            server.close();
+        if (!started.compareAndSet(true, false)) {
+            return;
         }
+        HTTPServer currentServer = server;
+        server = null;
+        if (currentServer != null) {
+            currentServer.close();
+        }
+        jvmMetricsEnabled.set(false);
     }
 
     private void ensureStarted() {

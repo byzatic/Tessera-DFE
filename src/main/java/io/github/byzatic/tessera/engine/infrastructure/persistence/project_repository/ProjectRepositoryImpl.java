@@ -58,6 +58,24 @@ public class ProjectRepositoryImpl implements ProjectRepository {
         }
     }
 
+    /**
+     * Creates repository state from a revision loaded by config-io.
+     *
+     * <p>The caller retains ownership of {@code loadedProject} and must keep it open while
+     * this repository is in use.</p>
+     *
+     * @param loadedProject loaded immutable project revision
+     */
+    public ProjectRepositoryImpl(ProjectLoadResultDataObject loadedProject) {
+        if (loadedProject == null) {
+            throw new IllegalArgumentException("loadedProject must not be null");
+        }
+        this.projectName = loadedProject.getProjectDirectory().getFileName().toString();
+        this.projectConfigurationLoader = ProjectV1LoaderFactory.create();
+        this.projectConfigurationMapper = new ProjectConfigurationMapper();
+        applyState(loadedProject);
+    }
+
     @Override
     public void addProjectLoader(
             ProjectLoaderTypes projectLoaderType,
@@ -143,6 +161,13 @@ public class ProjectRepositoryImpl implements ProjectRepository {
             closeAfterFailure(newLoadedProject, e);
             throw e;
         }
+    }
+
+    private void applyState(ProjectLoadResultDataObject source) {
+        ProjectRepositoryStateDataObject state = projectConfigurationMapper.map(source);
+        sharedResourcesContainer = state.getSharedResourcesContainer();
+        nodeContainer = state.getNodeContainer();
+        globalContainer = state.getGlobalContainer();
     }
 
     @Override

@@ -120,17 +120,21 @@ public class PipelineManager implements PipelineManagerInterface {
      * Глобальная привязка hub’ов к scheduler’ам.
      * Нужна для shared scheduler: один listener на инстанс scheduler’а на весь runtime.
      */
-    private static final ConcurrentHashMap<ImmediateSchedulerInterface, SchedulerTerminalHub> HUBS = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<ImmediateSchedulerInterface, Boolean> HUB_INSTALLED = new ConcurrentHashMap<>();
+    private static final Map<ImmediateSchedulerInterface, SchedulerTerminalHub> HUBS =
+            Collections.synchronizedMap(
+                    new WeakHashMap<ImmediateSchedulerInterface, SchedulerTerminalHub>()
+            );
 
     private static SchedulerTerminalHub hubFor(ImmediateSchedulerInterface scheduler) {
-        SchedulerTerminalHub hub = HUBS.computeIfAbsent(scheduler, s -> new SchedulerTerminalHub());
-
-        // install once per scheduler
-        if (HUB_INSTALLED.putIfAbsent(scheduler, Boolean.TRUE) == null) {
-            scheduler.addListener(hub.listener);
+        synchronized (HUBS) {
+            SchedulerTerminalHub hub = HUBS.get(scheduler);
+            if (hub == null) {
+                hub = new SchedulerTerminalHub();
+                scheduler.addListener(hub.listener);
+                HUBS.put(scheduler, hub);
+            }
+            return hub;
         }
-        return hub;
     }
 
     // ===== Constructor with external scheduler (shared) =====

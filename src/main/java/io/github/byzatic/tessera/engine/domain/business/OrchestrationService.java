@@ -22,6 +22,8 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -63,7 +65,9 @@ public final class OrchestrationService implements OrchestrationServiceInterface
      * Латч для блокировки start() до фатала или остановки.
      */
     private final CountDownLatch waitUntilStopOrFatal = new CountDownLatch(1);
+    private final CountDownLatch startupCompleted = new CountDownLatch(1);
     private final AtomicReference<Throwable> fatalError = new AtomicReference<>(null);
+    private final AtomicBoolean stopping = new AtomicBoolean(false);
 
     /**
      * Храним listener’ы, чтобы снять их при stop().
@@ -210,7 +214,10 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
                     @Override
                     public void onStopRequested() {
-                        // если появится кооперативная остановка графа — вызвать её здесь
+                        GraphManagerInterface currentGraphManager = graphManager;
+                        if (currentGraphManager != null) {
+                            currentGraphManager.stop();
+                        }
                     }
                 };
 
@@ -224,6 +231,7 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
             // ---- 4) Блокируемся до фатала или остановки ----
             state = ServiceState.RUNNING;
+            startupCompleted.countDown();
             logger.info("OrchestrationService is RUNNING. Waiting for stop() or fatal error...");
             waitUntilStopOrFatal.await();
 
@@ -246,18 +254,38 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         } catch (Throwable t) {
             state = ServiceState.FAULT;
             throw new BusinessLogicException("Unexpected orchestration error", t);
+        } finally {
+            startupCompleted.countDown();
         }
+    }
+
+    @Override
+    public boolean awaitStarted(Duration timeout) throws InterruptedException {
+        boolean completed = startupCompleted.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        return completed && state == ServiceState.RUNNING;
     }
 
     /**
      * Корректная остановка: разблокируем start(), снимаем cron-задачу, останавливаем сервисы и закрываем планировщики.
      */
     public void stop() {
+        if (!stopping.compareAndSet(false, true)) {
+            return;
+        }
         logger.info("OrchestrationService stopping...");
         state = ServiceState.STOPPING;
 
         // Разблокируем start() (если ещё не разблокирован фаталом)
         waitUntilStopOrFatal.countDown();
+
+        GraphManagerInterface currentGraphManager = graphManager;
+        if (currentGraphManager != null) {
+            try {
+                currentGraphManager.stop();
+            } catch (Throwable exception) {
+                logger.warn("Cannot request graph cancellation", exception);
+            }
+        }
 
         // Снимаем cron-задачу (если была)
         try {

@@ -14,6 +14,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 
 public class Configuration {
     private final static Logger logger = LoggerFactory.getLogger(Configuration.class);
@@ -70,6 +71,11 @@ public class Configuration {
     public static final String PROJECT_NAME;
     public static final Path PROJECT_SERVICES_PATH;
     public static final Path PROJECT_WORKFLOW_ROUTINES_PATH;
+    public static final Path PROJECT_ARCHIVE_PATH;
+    public static final Path PROJECT_STAGING_DIRECTORY;
+    public static final Duration PROJECT_WATCH_INTERVAL;
+    public static final Duration PROJECT_STARTUP_TIMEOUT;
+    public static final Duration PROJECT_SHUTDOWN_TIMEOUT;
     public static final URI PROMETHEUS_URI;
     public static final Boolean JVM_METRICS_ENABLED;
     public static final Boolean PUBLISH_NODE_PIPELINE_EXECUTION_TIME;
@@ -189,8 +195,6 @@ public class Configuration {
             result = configServicesPath;
             logger.debug("(config) PROJECT_SERVICES_PATH = {}", configServicesPath);
         } else {
-            if (!Files.exists(defaultServicesPath))
-                throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= " + defaultServicesPath);
             result = defaultServicesPath;
             logger.debug("(default) PROJECT_SERVICES_PATH = {}", defaultServicesPath);
         }
@@ -214,8 +218,6 @@ public class Configuration {
             result = configWorkflowRoutinesPath;
             logger.debug("(config) PROJECT_WORKFLOW_ROUTINES_PATH = {}", configWorkflowRoutinesPath);
         } else {
-            if (!Files.exists(defaultWorkflowRoutinesPath))
-                throw new ConfigurationException("Default workflowRoutinesPath not exists.");
             result = defaultWorkflowRoutinesPath;
             logger.debug("(default) PROJECT_WORKFLOW_ROUTINES_PATH = {}", defaultWorkflowRoutinesPath);
         }
@@ -376,6 +378,20 @@ public class Configuration {
             PROJECT_SERVICES_PATH = initProjectServicesPath(config);
 
             PROJECT_WORKFLOW_ROUTINES_PATH = initWorkflowRoutinesPath(config);
+
+            PROJECT_ARCHIVE_PATH = DATA_DIR.resolve("source_zip").resolve(PROJECT_NAME + ".zip");
+            PROJECT_STAGING_DIRECTORY = Paths.get(System.getProperty("java.io.tmpdir"))
+                    .resolve(APP_NAME)
+                    .resolve("project-revisions");
+            PROJECT_WATCH_INTERVAL = Duration.ofSeconds(Long.parseLong(
+                    System.getProperty("projectWatchIntervalSeconds", "1")
+            ));
+            PROJECT_STARTUP_TIMEOUT = Duration.ofSeconds(Long.parseLong(
+                    System.getProperty("projectStartupTimeoutSeconds", "60")
+            ));
+            PROJECT_SHUTDOWN_TIMEOUT = Duration.ofSeconds(Long.parseLong(
+                    System.getProperty("projectShutdownTimeoutSeconds", "180")
+            ));
 
             PROMETHEUS_URI = initPrometheusURI(config);
 
