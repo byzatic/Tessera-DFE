@@ -43,6 +43,8 @@ public final class ProjectReloadCoordinator
     private final AtomicBoolean revisionDrainScheduled = new AtomicBoolean(false);
     private final AtomicReference<ProjectRevision> pendingRevision =
             new AtomicReference<ProjectRevision>();
+    private final AtomicReference<Throwable> terminalFailure =
+            new AtomicReference<Throwable>();
     private final CountDownLatch terminated = new CountDownLatch(1);
 
     private ProjectRuntime activeRuntime;
@@ -78,8 +80,16 @@ public final class ProjectReloadCoordinator
      *
      * @throws InterruptedException when the waiting thread is interrupted
      */
-    public void awaitTermination() throws InterruptedException {
+    public void awaitTermination()
+            throws InterruptedException, OperationIncompleteException {
         terminated.await();
+        Throwable failure = terminalFailure.get();
+        if (failure != null) {
+            throw new OperationIncompleteException(
+                    "Active project runtime terminated with an error",
+                    failure
+            );
+        }
     }
 
     @Override
@@ -150,6 +160,7 @@ public final class ProjectReloadCoordinator
         ProjectRuntime candidate;
         try {
             candidate = runtimeFactory.create(revision);
+            candidate.setFailureListener(new RuntimeFailureListener());
         } catch (OperationIncompleteException exception) {
             logger.error("Cannot prepare project revision {}", revision.getRevisionId(), exception);
             closeRevision(revision, exception);
@@ -185,6 +196,57 @@ public final class ProjectReloadCoordinator
             closeRuntime(candidate);
             closeRevision(revision, exception);
             rollback(previousRuntime, previousRevision, exception);
+        }
+    }
+
+    private void reportRuntimeFailure(ProjectRuntime runtime, Throwable failure) {
+        if (closed.get()) {
+            return;
+        }
+        try {
+            reloadExecutor.execute(new RuntimeFailureCommand(runtime, failure));
+        } catch (RejectedExecutionException exception) {
+            failure.addSuppressed(exception);
+            terminalFailure.compareAndSet(null, failure);
+            terminated.countDown();
+        }
+    }
+
+    private final class RuntimeFailureListener implements ProjectRuntimeFailureListener {
+
+        @Override
+        public void onFailure(ProjectRuntime runtime, Throwable failure) {
+            reportRuntimeFailure(runtime, failure);
+        }
+    }
+
+    private final class RuntimeFailureCommand implements Runnable {
+
+        private final ProjectRuntime failedRuntime;
+        private final Throwable failure;
+
+        private RuntimeFailureCommand(ProjectRuntime failedRuntime, Throwable failure) {
+            this.failedRuntime = failedRuntime;
+            this.failure = failure;
+        }
+
+        @Override
+        public void run() {
+            if (failedRuntime != activeRuntime) {
+                return;
+            }
+            if (!terminalFailure.compareAndSet(null, failure)) {
+                return;
+            }
+
+            logger.error(
+                    "Active project runtime {} failed; terminating engine lifecycle",
+                    failedRuntime.getRevisionId(),
+                    failure
+            );
+            revisionSource.close();
+            stopAndCloseActiveRuntime();
+            terminated.countDown();
         }
     }
 

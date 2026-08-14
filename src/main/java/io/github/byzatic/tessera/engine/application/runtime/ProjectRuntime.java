@@ -10,6 +10,14 @@ import java.time.Duration;
 public interface ProjectRuntime extends AutoCloseable {
 
     /**
+     * Registers the listener receiving fatal failures that happen after startup.
+     *
+     * @param listener runtime failure listener
+     * @throws IllegalStateException when the listener was already registered
+     */
+    void setFailureListener(ProjectRuntimeFailureListener listener);
+
+    /**
      * Starts services and graph scheduling for the revision.
      *
      * @param startupTimeout maximum time allowed for reaching the running state

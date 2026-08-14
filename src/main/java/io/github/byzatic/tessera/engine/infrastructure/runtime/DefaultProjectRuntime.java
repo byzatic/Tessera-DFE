@@ -4,6 +4,7 @@ import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
 import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntime;
+import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFailureListener;
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceInterface;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.prometheus.metrics.model.registry.PrometheusRegistry;
@@ -34,6 +35,8 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
     private final ServiceLoaderInterface serviceLoader;
     private final ExecutorService orchestrationExecutor;
     private final AtomicReference<Throwable> executionFailure = new AtomicReference<Throwable>();
+    private final AtomicReference<ProjectRuntimeFailureListener> failureListener =
+            new AtomicReference<ProjectRuntimeFailureListener>();
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean stopped = new AtomicBoolean(false);
 
@@ -55,6 +58,16 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
         this.orchestrationExecutor = Executors.newSingleThreadExecutor(
                 new OrchestrationThreadFactory(revisionId)
         );
+    }
+
+    @Override
+    public void setFailureListener(ProjectRuntimeFailureListener listener) {
+        Objects.requireNonNull(listener, "listener");
+        if (!failureListener.compareAndSet(null, listener)) {
+            throw new IllegalStateException(
+                    "Project runtime failure listener is already registered: " + revisionId
+            );
+        }
     }
 
     @Override
@@ -170,7 +183,25 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
             } catch (Throwable failure) {
                 executionFailure.compareAndSet(null, failure);
                 logger.error("Project runtime {} terminated with an error", revisionId, failure);
+                notifyFailureListener(failure);
             }
+        }
+    }
+
+    private void notifyFailureListener(Throwable failure) {
+        ProjectRuntimeFailureListener listener = failureListener.get();
+        if (listener == null || stopped.get()) {
+            return;
+        }
+        try {
+            listener.onFailure(this, failure);
+        } catch (RuntimeException listenerFailure) {
+            failure.addSuppressed(listenerFailure);
+            logger.error(
+                    "Cannot report fatal failure of project runtime {}",
+                    revisionId,
+                    listenerFailure
+            );
         }
     }
 

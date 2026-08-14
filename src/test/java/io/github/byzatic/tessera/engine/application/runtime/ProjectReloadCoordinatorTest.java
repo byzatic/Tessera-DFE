@@ -26,7 +26,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class ProjectReloadCoordinatorTest {
 
@@ -64,6 +66,39 @@ public class ProjectReloadCoordinatorTest {
 
         assertTrue(previous.isClosed());
         assertTrue(factory.rollbackRuntime.getStopCount() == 1);
+    }
+
+    @Test
+    public void terminatesWhenActiveRuntimeReportsFatalFailure() throws Exception {
+        StubRevisionSource source = new StubRevisionSource();
+        StubRuntimeFactory factory = new StubRuntimeFactory();
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                source,
+                factory,
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+        ProjectRevision revision = createRevision("previous");
+        RuntimeException expectedFailure = new RuntimeException("Expected runtime failure");
+
+        try {
+            coordinator.start();
+            source.publish(revision);
+            assertTrue(factory.initialRuntime.awaitStarted());
+
+            factory.initialRuntime.fail(expectedFailure);
+
+            try {
+                coordinator.awaitTermination();
+                fail("Coordinator must propagate the active runtime failure");
+            } catch (OperationIncompleteException exception) {
+                assertSame(expectedFailure, exception.getCause());
+            }
+            assertTrue(factory.initialRuntime.getStopCount() == 1);
+            assertTrue(revision.isClosed());
+        } finally {
+            coordinator.close();
+        }
     }
 
     private ProjectRevision createRevision(String revisionId) throws Exception {
@@ -148,10 +183,16 @@ public class ProjectReloadCoordinatorTest {
         private final boolean failOnStart;
         private final CountDownLatch started = new CountDownLatch(1);
         private final AtomicInteger stopCount = new AtomicInteger();
+        private ProjectRuntimeFailureListener failureListener;
 
         private StubRuntime(String revisionId, boolean failOnStart) {
             this.revisionId = revisionId;
             this.failOnStart = failOnStart;
+        }
+
+        @Override
+        public void setFailureListener(ProjectRuntimeFailureListener listener) {
+            failureListener = listener;
         }
 
         @Override
@@ -182,6 +223,10 @@ public class ProjectReloadCoordinatorTest {
 
         private int getStopCount() {
             return stopCount.get();
+        }
+
+        private void fail(Throwable failure) {
+            failureListener.onFailure(this, failure);
         }
     }
 }
