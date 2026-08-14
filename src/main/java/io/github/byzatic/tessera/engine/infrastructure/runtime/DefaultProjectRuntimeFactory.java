@@ -12,8 +12,8 @@ import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFactor
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationService;
 import io.github.byzatic.tessera.engine.domain.repository.ProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_controller.StructureController;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_controller.StructureControllerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_controller.StructureController;
+import io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_controller.StructureControllerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectRepositoryImpl;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.storage_manager.StorageManager;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.GraphManagerFactory;

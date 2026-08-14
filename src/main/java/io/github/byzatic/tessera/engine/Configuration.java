@@ -67,10 +67,7 @@ public final class Configuration {
     public static volatile String CRON_EXPRESSION_STRING;
     public static volatile Boolean INITIALIZE_STORAGE_BY_REQUEST;
     public static volatile Path DATA_DIR;
-    public static volatile Path PROJECTS_DIR;
     public static volatile String PROJECT_NAME;
-    public static volatile Path PROJECT_SERVICES_PATH;
-    public static volatile Path PROJECT_WORKFLOW_ROUTINES_PATH;
     public static volatile Path PROJECT_ARCHIVE_PATH;
     public static volatile Path PROJECT_STAGING_DIRECTORY;
     public static volatile Duration PROJECT_WATCH_INTERVAL;
@@ -177,64 +174,6 @@ public final class Configuration {
             logger.debug("(config) PROJECT_NAME = {}", configProjectName);
         } else {
             throw new ConfigurationException("projectName is not set.");
-        }
-        return result;
-    }
-
-    private static Path initProjectServicesPath(
-            XMLConfiguration config,
-            Path projectsDirectory,
-            String projectName
-    ) throws ConfigurationException {
-        Path result;
-        Path propertyServicesPath = (System.getProperty("servicesPath", null) != null) ? Paths.get(System.getProperty("servicesPath")) : null;
-        Path configServicesPath = (config.getString("servicesPath") != null) ? Paths.get(config.getString("servicesPath")) : null;
-        Path defaultServicesPath = projectsDirectory.resolve(projectName)
-                .resolve("modules")
-                .resolve("services");
-
-        if (propertyServicesPath != null) {
-            if (!Files.exists(propertyServicesPath))
-                throw new ConfigurationException("Property servicesPath not exists. propertyServicesPath= " + propertyServicesPath);
-            result = propertyServicesPath;
-            logger.debug("(property) PROJECT_SERVICES_PATH = {}", propertyServicesPath);
-        } else if (configServicesPath != null) {
-            if (!Files.exists(configServicesPath))
-                throw new ConfigurationException("Config servicesPath not exists. configServicesPath= " + configServicesPath);
-            result = configServicesPath;
-            logger.debug("(config) PROJECT_SERVICES_PATH = {}", configServicesPath);
-        } else {
-            result = defaultServicesPath;
-            logger.debug("(default) PROJECT_SERVICES_PATH = {}", defaultServicesPath);
-        }
-        return result;
-    }
-
-    private static Path initWorkflowRoutinesPath(
-            XMLConfiguration config,
-            Path projectsDirectory,
-            String projectName
-    ) throws ConfigurationException {
-        Path result;
-        Path propertyWorkflowRoutinesPath = (System.getProperty("workflowRoutinesPath", null) != null) ? Paths.get(System.getProperty("workflowRoutinesPath")) : null;
-        Path configWorkflowRoutinesPath = (config.getString("workflowRoutinesPath") != null) ? Paths.get(config.getString("workflowRoutinesPath")) : null;
-        Path defaultWorkflowRoutinesPath = projectsDirectory.resolve(projectName)
-                .resolve("modules")
-                .resolve("workflow_routines");
-
-        if (propertyWorkflowRoutinesPath != null) {
-            if (!Files.exists(propertyWorkflowRoutinesPath))
-                throw new ConfigurationException("Property workflowRoutinesPath not exists.");
-            result = propertyWorkflowRoutinesPath;
-            logger.debug("(property) PROJECT_WORKFLOW_ROUTINES_PATH = {}", propertyWorkflowRoutinesPath);
-        } else if (configWorkflowRoutinesPath != null) {
-            if (!Files.exists(configWorkflowRoutinesPath))
-                throw new ConfigurationException("Config workflowRoutinesPath not exists.");
-            result = configWorkflowRoutinesPath;
-            logger.debug("(config) PROJECT_WORKFLOW_ROUTINES_PATH = {}", configWorkflowRoutinesPath);
-        } else {
-            result = defaultWorkflowRoutinesPath;
-            logger.debug("(default) PROJECT_WORKFLOW_ROUTINES_PATH = {}", defaultWorkflowRoutinesPath);
         }
         return result;
     }
@@ -392,26 +331,12 @@ public final class Configuration {
         String cronExpression = initCronExpressionString(config);
         Boolean initializeStorageByRequest = initInitializeStorageByRequest(config);
         Path dataDirectory = initDataDirectory(config);
-        Path projectsDirectory = dataDirectory.resolve("projects");
         String projectName = initProjectName(config);
-        Path projectServicesPath = initProjectServicesPath(
-                config,
-                projectsDirectory,
-                projectName
-        );
-        Path projectWorkflowRoutinesPath = initWorkflowRoutinesPath(
-                config,
-                projectsDirectory,
-                projectName
-        );
         return new ConfigurationSnapshot(
                 cronExpression,
                 initializeStorageByRequest,
                 dataDirectory,
-                projectsDirectory,
                 projectName,
-                projectServicesPath,
-                projectWorkflowRoutinesPath,
                 dataDirectory.resolve("source_zip").resolve(projectName + ".zip"),
                 Paths.get(System.getProperty("java.io.tmpdir"))
                         .resolve(APP_NAME)
@@ -448,10 +373,7 @@ public final class Configuration {
         CRON_EXPRESSION_STRING = snapshot.cronExpression;
         INITIALIZE_STORAGE_BY_REQUEST = snapshot.initializeStorageByRequest;
         DATA_DIR = snapshot.dataDirectory;
-        PROJECTS_DIR = snapshot.projectsDirectory;
         PROJECT_NAME = snapshot.projectName;
-        PROJECT_SERVICES_PATH = snapshot.projectServicesPath;
-        PROJECT_WORKFLOW_ROUTINES_PATH = snapshot.projectWorkflowRoutinesPath;
         PROJECT_ARCHIVE_PATH = snapshot.projectArchivePath;
         PROJECT_STAGING_DIRECTORY = snapshot.projectStagingDirectory;
         PROJECT_WATCH_INTERVAL = snapshot.projectWatchInterval;
@@ -468,10 +390,7 @@ public final class Configuration {
         private final String cronExpression;
         private final Boolean initializeStorageByRequest;
         private final Path dataDirectory;
-        private final Path projectsDirectory;
         private final String projectName;
-        private final Path projectServicesPath;
-        private final Path projectWorkflowRoutinesPath;
         private final Path projectArchivePath;
         private final Path projectStagingDirectory;
         private final Duration projectWatchInterval;
@@ -486,10 +405,7 @@ public final class Configuration {
                 String cronExpression,
                 Boolean initializeStorageByRequest,
                 Path dataDirectory,
-                Path projectsDirectory,
                 String projectName,
-                Path projectServicesPath,
-                Path projectWorkflowRoutinesPath,
                 Path projectArchivePath,
                 Path projectStagingDirectory,
                 Duration projectWatchInterval,
@@ -503,10 +419,7 @@ public final class Configuration {
             this.cronExpression = cronExpression;
             this.initializeStorageByRequest = initializeStorageByRequest;
             this.dataDirectory = dataDirectory;
-            this.projectsDirectory = projectsDirectory;
             this.projectName = projectName;
-            this.projectServicesPath = projectServicesPath;
-            this.projectWorkflowRoutinesPath = projectWorkflowRoutinesPath;
             this.projectArchivePath = projectArchivePath;
             this.projectStagingDirectory = projectStagingDirectory;
             this.projectWatchInterval = projectWatchInterval;

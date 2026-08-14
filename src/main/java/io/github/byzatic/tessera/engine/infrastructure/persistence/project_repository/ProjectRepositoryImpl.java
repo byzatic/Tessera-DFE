@@ -1,10 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository;
 
-import io.github.byzatic.lib.configio.application.loader.ProjectLoaderInterface;
-import io.github.byzatic.lib.configio.domain.exception.ProjectLoadingException;
 import io.github.byzatic.lib.configio.domain.model.ProjectLoadResultDataObject;
-import io.github.byzatic.lib.configio.infrastructure.factory.ProjectV1LoaderFactory;
-import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
@@ -21,42 +17,14 @@ import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repos
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.mapper.ProjectRepositoryStateDataObject;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-public class ProjectRepositoryImpl implements ProjectRepository {
-    private final static Logger logger = LoggerFactory.getLogger(ProjectRepositoryImpl.class);
-    private final String projectName;
-    private final Map<ProjectLoaderTypes, io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectLoaderInterface> projectLoaderTypedMap = new HashMap<>();
-    private final ProjectLoaderInterface projectConfigurationLoader;
+public final class ProjectRepositoryImpl implements ProjectRepository {
     private final ProjectConfigurationMapper projectConfigurationMapper;
 
-    private SharedResourcesContainer sharedResourcesContainer = null;
-    private NodeContainer nodeContainer = null;
-    private GlobalContainer globalContainer = null;
-    private ProjectLoadResultDataObject loadedProject = null;
-
-    public ProjectRepositoryImpl(String projectName) {
-        this(projectName, false);
-    }
-
-    public ProjectRepositoryImpl(String projectName, Boolean loadNow) {
-        this.projectName = projectName;
-        this.projectConfigurationLoader = ProjectV1LoaderFactory.create();
-        this.projectConfigurationMapper = new ProjectConfigurationMapper();
-        if (loadNow) {
-            try {
-                load();
-            } catch (OperationIncompleteException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
+    private SharedResourcesContainer sharedResourcesContainer;
+    private NodeContainer nodeContainer;
+    private GlobalContainer globalContainer;
 
     /**
      * Creates repository state from a revision loaded by config-io.
@@ -70,18 +38,8 @@ public class ProjectRepositoryImpl implements ProjectRepository {
         if (loadedProject == null) {
             throw new IllegalArgumentException("loadedProject must not be null");
         }
-        this.projectName = loadedProject.getProjectDirectory().getFileName().toString();
-        this.projectConfigurationLoader = ProjectV1LoaderFactory.create();
         this.projectConfigurationMapper = new ProjectConfigurationMapper();
         applyState(loadedProject);
-    }
-
-    @Override
-    public void addProjectLoader(
-            ProjectLoaderTypes projectLoaderType,
-            io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.ProjectLoaderInterface projectLoader
-    ) {
-        projectLoaderTypedMap.put(projectLoaderType, projectLoader);
     }
 
     @Override
@@ -138,31 +96,6 @@ public class ProjectRepositoryImpl implements ProjectRepository {
         return sharedResourcesContainer.getSharedResourcesClassLoader();
     }
 
-    @Override
-    public void load() throws OperationIncompleteException {
-        ProjectLoadResultDataObject newLoadedProject = null;
-        try {
-            newLoadedProject = projectConfigurationLoader.load(
-                    Configuration.PROJECTS_DIR.resolve(projectName)
-            );
-            ProjectRepositoryStateDataObject newState =
-                    projectConfigurationMapper.map(newLoadedProject);
-
-            ProjectLoadResultDataObject previousLoadedProject = loadedProject;
-            loadedProject = newLoadedProject;
-            sharedResourcesContainer = newState.getSharedResourcesContainer();
-            nodeContainer = newState.getNodeContainer();
-            globalContainer = newState.getGlobalContainer();
-            closeLoadedProject(previousLoadedProject);
-        } catch (ProjectLoadingException e) {
-            closeAfterFailure(newLoadedProject, e);
-            throw new OperationIncompleteException("Cannot load project " + projectName, e);
-        } catch (RuntimeException e) {
-            closeAfterFailure(newLoadedProject, e);
-            throw e;
-        }
-    }
-
     private void applyState(ProjectLoadResultDataObject source) {
         ProjectRepositoryStateDataObject state = projectConfigurationMapper.map(source);
         sharedResourcesContainer = state.getSharedResourcesContainer();
@@ -171,37 +104,8 @@ public class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     @Override
-    public void reload() throws OperationIncompleteException {
-        load();
-    }
-
-    @Override
     public @NotNull NodeToGNRContainer getNodeToGNRContainer() throws OperationIncompleteException {
         return new NodeToGNRContainer(nodeContainer.getNodeMap());
     }
 
-    private void closeLoadedProject(ProjectLoadResultDataObject project) {
-        if (project == null) {
-            return;
-        }
-        try {
-            project.close();
-        } catch (IOException e) {
-            throw new RuntimeException("Cannot close previously loaded project", e);
-        }
-    }
-
-    private void closeAfterFailure(
-            ProjectLoadResultDataObject project,
-            Throwable failure
-    ) {
-        if (project == null) {
-            return;
-        }
-        try {
-            project.close();
-        } catch (IOException e) {
-            failure.addSuppressed(e);
-        }
-    }
 }

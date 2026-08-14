@@ -1,6 +1,5 @@
-package io.github.byzatic.tessera.engine.infrastructure.persistence.configuration_dao.single_root_strict_nested_node_tree.project_structure_controller;
+package io.github.byzatic.tessera.engine.infrastructure.persistence.project_structure_controller;
 
-import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
@@ -13,11 +12,6 @@ import java.util.Objects;
 public class StructureController implements StructureControllerInterface {
     private final static Logger logger = LoggerFactory.getLogger(StructureController.class);
     private final Path projectsDirectory;
-
-    public StructureController(String projectName) {
-        //TODO: check if exists
-        this.projectsDirectory = Configuration.PROJECTS_DIR.resolve(projectName);
-    }
 
     /**
      * Creates a controller for an isolated project revision directory.
