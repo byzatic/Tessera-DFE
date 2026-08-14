@@ -103,9 +103,10 @@ public final class TesseraEngineLifecycleManager implements AutoCloseable {
         Thread shutdownHook = createShutdownHook();
         Runtime.getRuntime().addShutdownHook(shutdownHook);
         try {
-            start();
-            lifecycleTerminated.await();
-            rethrowLifecycleFailure();
+            if (start()) {
+                lifecycleTerminated.await();
+                rethrowLifecycleFailure();
+            }
         } finally {
             close();
             removeShutdownHook(shutdownHook);
@@ -117,12 +118,12 @@ public final class TesseraEngineLifecycleManager implements AutoCloseable {
      *
      * @throws Exception when metrics or lifecycle task startup fails
      */
-    private void start() throws Exception {
+    private synchronized boolean start() throws Exception {
+        if (closed.get()) {
+            return false;
+        }
         if (!started.compareAndSet(false, true)) {
             throw new IllegalStateException("Engine lifecycle is already started");
-        }
-        if (closed.get()) {
-            throw new IllegalStateException("Engine lifecycle is already closed");
         }
 
         metricsAgent.start(Configuration.PROMETHEUS_URI);
@@ -134,13 +135,14 @@ public final class TesseraEngineLifecycleManager implements AutoCloseable {
         if (closed.get()) {
             closeLifecycleTask();
         }
+        return true;
     }
 
     /**
      * Stops revision observation, the active project runtime, metrics, and lifecycle scheduling.
      */
     @Override
-    public void close() {
+    public synchronized void close() {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
