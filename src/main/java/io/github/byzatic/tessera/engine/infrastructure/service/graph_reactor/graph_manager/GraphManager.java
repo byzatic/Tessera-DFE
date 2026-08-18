@@ -238,6 +238,11 @@ public class GraphManager implements GraphManagerInterface {
         }
     }
 
+    @Override
+    public void stop() {
+        graphTraversal.cancel();
+    }
+
     private void clear() throws OperationIncompleteException {
         try {
             this.storageManager.cleanupNodeStorages();

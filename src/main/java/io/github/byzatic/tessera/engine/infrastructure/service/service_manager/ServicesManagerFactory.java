@@ -2,11 +2,11 @@ package io.github.byzatic.tessera.engine.infrastructure.service.service_manager;
 
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
+import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
 import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_loader.ServiceLoaderInterface;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;

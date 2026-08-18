@@ -11,7 +11,7 @@ services:
       - "9090:9090"
     volumes:
       - $PWD/configurations/:/app/configurations/
-      - $PWD/data/source/:/app/data/source_zip
+      - $PWD/data/source_zip/:/app/data/source_zip
       - $PWD/logs/:/app/logs/
       - $PWD/flight_recording/:/tmp/flight_recording/
     environment:
@@ -27,8 +27,9 @@ services:
       #- JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,dumponexit=true,maxsize=512m,maxage=1h,delay=348s
       # Develop Flight Recording
       - JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,duration=300s,delay=400s,ParallelGCThreads=2
-      - IS_ENABLE_WATCH=False
-      - DATA_DIR_WATCH_INTERVAL=500
+      - PROJECT_WATCH_INTERVAL_SECONDS=1
+      - PROJECT_STARTUP_TIMEOUT_SECONDS=60
+      - PROJECT_SHUTDOWN_TIMEOUT_SECONDS=180
     logging:
       driver: json-file
       options:
@@ -41,7 +42,6 @@ networks:
   93849dcd429a-test-develop-tessera-dfe:
     name: 93849dcd429a-test-develop-tessera-dfe
     external: false
-
 
 
 

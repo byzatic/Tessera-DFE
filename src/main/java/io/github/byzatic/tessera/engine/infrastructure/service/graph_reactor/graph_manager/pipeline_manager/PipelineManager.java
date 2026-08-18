@@ -1,6 +1,8 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager;
 
 import io.github.byzatic.commons.schedulers.immediate.*;
+import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
+import io.github.byzatic.lib.configio.domain.exception.PluginLoadingException;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
@@ -13,7 +15,6 @@ import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gra
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.MCg3WorkflowRoutineApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.StorageApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context.ExecutionContextFactoryInterface;
-import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.module_loader.ModuleLoaderInterface;
 import io.github.byzatic.tessera.workflowroutine.configuration.ConfigurationParameter;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.WorkflowRoutineInterface;
 import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy;
@@ -119,17 +120,21 @@ public class PipelineManager implements PipelineManagerInterface {
      * Глобальная привязка hub’ов к scheduler’ам.
      * Нужна для shared scheduler: один listener на инстанс scheduler’а на весь runtime.
      */
-    private static final ConcurrentHashMap<ImmediateSchedulerInterface, SchedulerTerminalHub> HUBS = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<ImmediateSchedulerInterface, Boolean> HUB_INSTALLED = new ConcurrentHashMap<>();
+    private static final Map<ImmediateSchedulerInterface, SchedulerTerminalHub> HUBS =
+            Collections.synchronizedMap(
+                    new WeakHashMap<ImmediateSchedulerInterface, SchedulerTerminalHub>()
+            );
 
     private static SchedulerTerminalHub hubFor(ImmediateSchedulerInterface scheduler) {
-        SchedulerTerminalHub hub = HUBS.computeIfAbsent(scheduler, s -> new SchedulerTerminalHub());
-
-        // install once per scheduler
-        if (HUB_INSTALLED.putIfAbsent(scheduler, Boolean.TRUE) == null) {
-            scheduler.addListener(hub.listener);
+        synchronized (HUBS) {
+            SchedulerTerminalHub hub = HUBS.get(scheduler);
+            if (hub == null) {
+                hub = new SchedulerTerminalHub();
+                scheduler.addListener(hub.listener);
+                HUBS.put(scheduler, hub);
+            }
+            return hub;
         }
-        return hub;
     }
 
     // ===== Constructor with external scheduler (shared) =====
@@ -331,6 +336,11 @@ public class PipelineManager implements PipelineManagerInterface {
                     }
                 }
 
+            } catch (PluginLoadingException exception) {
+                throw new OperationIncompleteException(
+                        "Cannot load workflow routine for stage " + stage.getStageId(),
+                        exception
+                );
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 throw new OperationIncompleteException("Interrupted while waiting stage " + stage.getStageId(), ie);

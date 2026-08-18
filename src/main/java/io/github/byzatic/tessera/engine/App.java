@@ -1,21 +1,30 @@
 package io.github.byzatic.tessera.engine;
 
+import io.github.byzatic.tessera.engine.infrastructure.runtime.EngineSupervisor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.github.byzatic.tessera.engine.application.usecase.ProjectOrchestrator;
-import io.github.byzatic.tessera.engine.infrastructure.config.ApplicationMainContext;
 
-public class App {
-    private final static Logger logger= LoggerFactory.getLogger(App.class);
+/**
+ * JVM entry point for Tessera DFE.
+ */
+public final class App {
 
-    public static void main( String[] args ) {
-        try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use()) {
-            logger.debug("Run application {} version {}", Configuration.APP_NAME, Configuration.APP_VERSION);
+    private static final Logger logger = LoggerFactory.getLogger(App.class);
 
-            new ProjectOrchestrator(ApplicationMainContext.getDomainLogic()).orchestrateProject();
+    private App() {
+    }
 
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    public static void main(String[] args) {
+        try (AutoCloseable ignored = Configuration.MDC_ENGINE_CONTEXT.use();
+             EngineSupervisor engineSupervisor = EngineSupervisor.createDefault()) {
+            logger.debug(
+                    "Run application {} version {}",
+                    Configuration.APP_NAME,
+                    Configuration.APP_VERSION
+            );
+            engineSupervisor.run();
+        } catch (Exception exception) {
+            throw new RuntimeException("Tessera DFE terminated with an error", exception);
         }
     }
 }

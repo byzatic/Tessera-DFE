@@ -14,8 +14,9 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 
-public class Configuration {
+public final class Configuration {
     private final static Logger logger = LoggerFactory.getLogger(Configuration.class);
     public final static MdcContextInterface MDC_ENGINE_CONTEXT = MdcEngineContext.newBuilder().build();
     public static final String APP_NAME = "Tessera-DFE";
@@ -63,17 +64,22 @@ public class Configuration {
     //   - "0 12 1/5 * *"         runs every fifth day of the month at 12:00:00.
     //   - "0 0 12 * * 1-5"       runs at 12:00:00 Monday–Friday (0=Sun, 1=Mon, …, 6=Sat).
     //   - "* * * * * *"          runs every second.
-    public static final String CRON_EXPRESSION_STRING;
-    public static final Boolean INITIALIZE_STORAGE_BY_REQUEST;
-    public static final Path DATA_DIR;
-    public static final Path PROJECTS_DIR;
-    public static final String PROJECT_NAME;
-    public static final Path PROJECT_SERVICES_PATH;
-    public static final Path PROJECT_WORKFLOW_ROUTINES_PATH;
-    public static final URI PROMETHEUS_URI;
-    public static final Boolean JVM_METRICS_ENABLED;
-    public static final Boolean PUBLISH_NODE_PIPELINE_EXECUTION_TIME;
-    public static final Boolean PUBLISH_STORAGE_ANALYTICS;
+    public static volatile String CRON_EXPRESSION_STRING;
+    public static volatile Boolean INITIALIZE_STORAGE_BY_REQUEST;
+    public static volatile Path DATA_DIR;
+    public static volatile String PROJECT_NAME;
+    public static volatile Path PROJECT_ARCHIVE_PATH;
+    public static volatile Path PROJECT_STAGING_DIRECTORY;
+    public static volatile Duration PROJECT_WATCH_INTERVAL;
+    public static volatile Duration PROJECT_STARTUP_TIMEOUT;
+    public static volatile Duration PROJECT_SHUTDOWN_TIMEOUT;
+    public static volatile URI PROMETHEUS_URI;
+    public static volatile Boolean JVM_METRICS_ENABLED;
+    public static volatile Boolean PUBLISH_NODE_PIPELINE_EXECUTION_TIME;
+    public static volatile Boolean PUBLISH_STORAGE_ANALYTICS;
+
+    private Configuration() {
+    }
 
     private static Path initConfigFilePath() throws ConfigurationException {
         Path result;
@@ -168,56 +174,6 @@ public class Configuration {
             logger.debug("(config) PROJECT_NAME = {}", configProjectName);
         } else {
             throw new ConfigurationException("projectName is not set.");
-        }
-        return result;
-    }
-
-    private static Path initProjectServicesPath(XMLConfiguration config) throws ConfigurationException {
-        Path result;
-        Path propertyServicesPath = (System.getProperty("servicesPath", null) != null) ? Paths.get(System.getProperty("servicesPath")) : null;
-        Path configServicesPath = (config.getString("servicesPath") != null) ? Paths.get(config.getString("servicesPath")) : null;
-        Path defaultServicesPath = PROJECTS_DIR.resolve(PROJECT_NAME).resolve("modules").resolve("services");
-
-        if (propertyServicesPath != null) {
-            if (!Files.exists(propertyServicesPath))
-                throw new ConfigurationException("Property servicesPath not exists. propertyServicesPath= " + propertyServicesPath);
-            result = propertyServicesPath;
-            logger.debug("(property) PROJECT_SERVICES_PATH = {}", propertyServicesPath);
-        } else if (configServicesPath != null) {
-            if (!Files.exists(configServicesPath))
-                throw new ConfigurationException("Config servicesPath not exists. configServicesPath= " + configServicesPath);
-            result = configServicesPath;
-            logger.debug("(config) PROJECT_SERVICES_PATH = {}", configServicesPath);
-        } else {
-            if (!Files.exists(defaultServicesPath))
-                throw new ConfigurationException("Default servicesPath not exists. defaultServicesPath= " + defaultServicesPath);
-            result = defaultServicesPath;
-            logger.debug("(default) PROJECT_SERVICES_PATH = {}", defaultServicesPath);
-        }
-        return result;
-    }
-
-    private static Path initWorkflowRoutinesPath(XMLConfiguration config) throws ConfigurationException {
-        Path result;
-        Path propertyWorkflowRoutinesPath = (System.getProperty("workflowRoutinesPath", null) != null) ? Paths.get(System.getProperty("workflowRoutinesPath")) : null;
-        Path configWorkflowRoutinesPath = (config.getString("workflowRoutinesPath") != null) ? Paths.get(config.getString("workflowRoutinesPath")) : null;
-        Path defaultWorkflowRoutinesPath = PROJECTS_DIR.resolve(PROJECT_NAME).resolve("modules").resolve("workflow_routines");
-
-        if (propertyWorkflowRoutinesPath != null) {
-            if (!Files.exists(propertyWorkflowRoutinesPath))
-                throw new ConfigurationException("Property workflowRoutinesPath not exists.");
-            result = propertyWorkflowRoutinesPath;
-            logger.debug("(property) PROJECT_WORKFLOW_ROUTINES_PATH = {}", propertyWorkflowRoutinesPath);
-        } else if (configWorkflowRoutinesPath != null) {
-            if (!Files.exists(configWorkflowRoutinesPath))
-                throw new ConfigurationException("Config workflowRoutinesPath not exists.");
-            result = configWorkflowRoutinesPath;
-            logger.debug("(config) PROJECT_WORKFLOW_ROUTINES_PATH = {}", configWorkflowRoutinesPath);
-        } else {
-            if (!Files.exists(defaultWorkflowRoutinesPath))
-                throw new ConfigurationException("Default workflowRoutinesPath not exists.");
-            result = defaultWorkflowRoutinesPath;
-            logger.debug("(default) PROJECT_WORKFLOW_ROUTINES_PATH = {}", defaultWorkflowRoutinesPath);
         }
         return result;
     }
@@ -345,52 +301,149 @@ public class Configuration {
     }
 
 
+    /**
+     * Reloads all runtime settings from the configured XML file.
+     *
+     * <p>The new values are parsed and validated before any globally visible setting is changed.
+     * Callers must stop the current engine runtime before invoking this method and must not start
+     * another runtime until the method returns.</p>
+     *
+     * @throws ConfigurationException when the candidate configuration cannot be loaded
+     */
+    public static synchronized void reload() throws ConfigurationException {
+        ConfigurationSnapshot candidate = loadSnapshot();
+        publish(candidate);
+        logger.info("Engine configuration loaded from {}", CONFIGURATION_FILE_PATH);
+    }
+
+    /**
+     * Parses and validates the current configuration file without publishing its values.
+     *
+     * @throws ConfigurationException when the candidate configuration cannot be loaded
+     */
+    public static void validateCandidate() throws ConfigurationException {
+        loadSnapshot();
+    }
+
+    private static ConfigurationSnapshot loadSnapshot() throws ConfigurationException {
+        Configurations configurations = new Configurations();
+        XMLConfiguration config = configurations.xml(CONFIGURATION_FILE_PATH.toFile());
+        String cronExpression = initCronExpressionString(config);
+        Boolean initializeStorageByRequest = initInitializeStorageByRequest(config);
+        Path dataDirectory = initDataDirectory(config);
+        String projectName = initProjectName(config);
+        return new ConfigurationSnapshot(
+                cronExpression,
+                initializeStorageByRequest,
+                dataDirectory,
+                projectName,
+                dataDirectory.resolve("source_zip").resolve(projectName + ".zip"),
+                Paths.get(System.getProperty("java.io.tmpdir"))
+                        .resolve(APP_NAME)
+                        .resolve("project-revisions"),
+                readPositiveDuration("projectWatchIntervalSeconds", "1"),
+                readPositiveDuration("projectStartupTimeoutSeconds", "60"),
+                readPositiveDuration("projectShutdownTimeoutSeconds", "180"),
+                initPrometheusURI(config),
+                initJvmMetricsEnabled(config),
+                initPublishNodePipelineExecutionTime(config),
+                initPublishStorageAnalytics(config)
+        );
+    }
+
+    private static Duration readPositiveDuration(String propertyName, String defaultValue)
+            throws ConfigurationException {
+        try {
+            Duration duration = Duration.ofSeconds(Long.parseLong(
+                    System.getProperty(propertyName, defaultValue)
+            ));
+            if (duration.isZero() || duration.isNegative()) {
+                throw new ConfigurationException(propertyName + " must be greater than zero");
+            }
+            return duration;
+        } catch (NumberFormatException exception) {
+            throw new ConfigurationException(
+                    propertyName + " must contain a whole number of seconds",
+                    exception
+            );
+        }
+    }
+
+    private static void publish(ConfigurationSnapshot snapshot) {
+        CRON_EXPRESSION_STRING = snapshot.cronExpression;
+        INITIALIZE_STORAGE_BY_REQUEST = snapshot.initializeStorageByRequest;
+        DATA_DIR = snapshot.dataDirectory;
+        PROJECT_NAME = snapshot.projectName;
+        PROJECT_ARCHIVE_PATH = snapshot.projectArchivePath;
+        PROJECT_STAGING_DIRECTORY = snapshot.projectStagingDirectory;
+        PROJECT_WATCH_INTERVAL = snapshot.projectWatchInterval;
+        PROJECT_STARTUP_TIMEOUT = snapshot.projectStartupTimeout;
+        PROJECT_SHUTDOWN_TIMEOUT = snapshot.projectShutdownTimeout;
+        PROMETHEUS_URI = snapshot.prometheusUri;
+        JVM_METRICS_ENABLED = snapshot.jvmMetricsEnabled;
+        PUBLISH_NODE_PIPELINE_EXECUTION_TIME = snapshot.publishNodePipelineExecutionTime;
+        PUBLISH_STORAGE_ANALYTICS = snapshot.publishStorageAnalytics;
+    }
+
+    private static final class ConfigurationSnapshot {
+
+        private final String cronExpression;
+        private final Boolean initializeStorageByRequest;
+        private final Path dataDirectory;
+        private final String projectName;
+        private final Path projectArchivePath;
+        private final Path projectStagingDirectory;
+        private final Duration projectWatchInterval;
+        private final Duration projectStartupTimeout;
+        private final Duration projectShutdownTimeout;
+        private final URI prometheusUri;
+        private final Boolean jvmMetricsEnabled;
+        private final Boolean publishNodePipelineExecutionTime;
+        private final Boolean publishStorageAnalytics;
+
+        private ConfigurationSnapshot(
+                String cronExpression,
+                Boolean initializeStorageByRequest,
+                Path dataDirectory,
+                String projectName,
+                Path projectArchivePath,
+                Path projectStagingDirectory,
+                Duration projectWatchInterval,
+                Duration projectStartupTimeout,
+                Duration projectShutdownTimeout,
+                URI prometheusUri,
+                Boolean jvmMetricsEnabled,
+                Boolean publishNodePipelineExecutionTime,
+                Boolean publishStorageAnalytics
+        ) {
+            this.cronExpression = cronExpression;
+            this.initializeStorageByRequest = initializeStorageByRequest;
+            this.dataDirectory = dataDirectory;
+            this.projectName = projectName;
+            this.projectArchivePath = projectArchivePath;
+            this.projectStagingDirectory = projectStagingDirectory;
+            this.projectWatchInterval = projectWatchInterval;
+            this.projectStartupTimeout = projectStartupTimeout;
+            this.projectShutdownTimeout = projectShutdownTimeout;
+            this.prometheusUri = prometheusUri;
+            this.jvmMetricsEnabled = jvmMetricsEnabled;
+            this.publishNodePipelineExecutionTime = publishNodePipelineExecutionTime;
+            this.publishStorageAnalytics = publishStorageAnalytics;
+        }
+    }
+
     static {
         MdcContextInterface mdcEngineContext = MdcEngineContext.newBuilder().build();
-        Logger logger = LoggerFactory.getLogger(Configuration.class);
-        Configurations configs = new Configurations();
+        APP_VERSION = readImplementationVersion();
+        SPECIFICATION_VERSION = readSpecificationVersion();
         try (AutoCloseable ignored = mdcEngineContext.use()) {
-            logger.debug("Configure instance.");
-
-            APP_VERSION = readImplementationVersion();
-
-            SPECIFICATION_VERSION = readSpecificationVersion();
-
             CONFIGURATION_FILE_PATH = initConfigFilePath();
-
-            XMLConfiguration config = configs.xml(CONFIGURATION_FILE_PATH.toFile());
-
-            CRON_EXPRESSION_STRING = initCronExpressionString(config);
-
-            INITIALIZE_STORAGE_BY_REQUEST = initInitializeStorageByRequest(config);
-
-            logger.debug("(default only) WORKING_DIR = {}", WORKING_DIR);
-
-            DATA_DIR = initDataDirectory(config);
-
-            PROJECTS_DIR = Configuration.DATA_DIR.resolve("projects");
-            logger.debug("(default only) PROJECTS_DIR = {}", PROJECTS_DIR);
-
-            PROJECT_NAME = initProjectName(config);
-
-            PROJECT_SERVICES_PATH = initProjectServicesPath(config);
-
-            PROJECT_WORKFLOW_ROUTINES_PATH = initWorkflowRoutinesPath(config);
-
-            PROMETHEUS_URI = initPrometheusURI(config);
-
-            JVM_METRICS_ENABLED = initJvmMetricsEnabled(config);
-
-            PUBLISH_NODE_PIPELINE_EXECUTION_TIME = initPublishNodePipelineExecutionTime(config);
-
-            PUBLISH_STORAGE_ANALYTICS = initPublishStorageAnalytics(config);
-
-            logger.debug("Configuration complete.");
-        } catch (ConfigurationException ce) {
-            logger.error("Exception : " + ExceptionUtils.getStackTrace(ce));
-            throw new RuntimeException("Error reading configuration", ce);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            reload();
+        } catch (ConfigurationException exception) {
+            logger.error("Exception: {}", ExceptionUtils.getStackTrace(exception));
+            throw new ExceptionInInitializerError(exception);
+        } catch (Exception exception) {
+            throw new ExceptionInInitializerError(exception);
         }
     }
 }

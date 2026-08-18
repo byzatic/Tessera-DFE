@@ -4,12 +4,12 @@
 
   <groupId>io.github.byzatic.tessera</groupId>
   <artifactId>tessera-dfe</artifactId>
-  <!--<version>0.1.3-SNAPSHOT</version>-->
-  <version>0.1.4</version>
+  <!--<version>0.1.5-SNAPSHOT</version>-->
+  <version>0.1.5</version>
   <packaging>jar</packaging>
 
   <name>Tessera-DFE</name>
-  <url>http://maven.apache.org</url>
+  <url>https://github.com/byzatic/Tessera-DFE</url>
 
   <!-- manual set -->
   <properties>
@@ -24,6 +24,7 @@
     <version.prometheus_metrics>1.5.0</version.prometheus_metrics>
     <version.java_byzatic_commons>0.0.6</version.java_byzatic_commons>
     <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
+    <version.lib_tessera_dfe_project_io>0.0.1</version.lib_tessera_dfe_project_io>
     <!-- manual versions end -->
   </properties>
   <!-- manual set end -->
@@ -61,6 +62,13 @@
       <groupId>io.github.byzatic</groupId>
       <artifactId>tessera-workflowroutine-lib</artifactId>
       <version>${version.tessera_workflow_toolkit}</version>
+    </dependency>
+
+    <!-- https://central.sonatype.com/artifact/io.github.byzatic/lib-tessera-dfe-project-io -->
+    <dependency>
+      <groupId>io.github.byzatic</groupId>
+      <artifactId>lib-tessera-dfe-project-io</artifactId>
+      <version>${version.lib_tessera_dfe_project_io}</version>
     </dependency>
 
     <!-- https://central.sonatype.com/artifact/io.github.byzatic/java-byzatic-commons -->
@@ -182,6 +190,13 @@
 
   </dependencies>
   <!-- manual set end -->
+
+  <repositories>
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+    </repository>
+  </repositories>
 
   <!-- manual set -->
   <build>
@@ -376,4 +391,3 @@
 
   <!-- jpa_like_project_global_repository end -->
 </project>
-

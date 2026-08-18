@@ -5,4 +5,9 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 public interface GraphManagerInterface {
 
     void runGraph() throws OperationIncompleteException;
+
+    /**
+     * Requests cooperative cancellation of an active graph traversal.
+     */
+    void stop();
 }
