@@ -11,7 +11,7 @@ services:
       - "9090:9090"
     volumes:
       - $PWD/configurations/:/app/configurations/
-      - $PWD/data/source/:/app/data/source_zip
+      - $PWD/data/source_zip/:/app/data/source_zip
       - $PWD/logs/:/app/logs/
       - $PWD/flight_recording/:/tmp/flight_recording/
     environment:

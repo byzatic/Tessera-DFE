@@ -19,8 +19,10 @@ PROJECT_SHUTDOWN_TIMEOUT_SECONDS="${PROJECT_SHUTDOWN_TIMEOUT_SECONDS-}"
 
 JAVA_OPTS=(
   -server
-  -Xms"${XMS:-512m}"
-  -Xmx"${XMX:-1024m}"
+#  -Xms"${XMS:-512m}"
+#  -Xmx"${XMX:-1024m}"
+  -Xms"${XMS:-1024m}"
+  -Xmx"${XMX:-2048m}"
 )
 
 add_sysprop_if_set() {

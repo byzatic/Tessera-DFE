@@ -8,6 +8,7 @@ import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFailur
 import io.github.byzatic.tessera.engine.domain.business.OrchestrationServiceInterface;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.prometheus.metrics.model.registry.PrometheusRegistry;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -214,7 +215,7 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
         }
 
         @Override
-        public Thread newThread(Runnable runnable) {
+        public Thread newThread(@NotNull Runnable runnable) {
             String shortRevision = revisionId.substring(0, Math.min(12, revisionId.length()));
             Thread thread = new Thread(runnable, "project-runtime-" + shortRevision);
             thread.setDaemon(false);

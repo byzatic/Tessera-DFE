@@ -14,7 +14,7 @@ COPY pom.xml .
 COPY src ./src
 
 # Build the application
-RUN mvn package -DskipTests -U --batch-mode package
+RUN mvn package -DskipTests -U --batch-mode
 
 # Temp work dirs
 RUN mkdir -p /temp_1/data/projects
