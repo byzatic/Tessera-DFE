@@ -24,4 +24,4 @@ for arg in "$@"; do
 done
 
 # Запускаем сборку
-docker-compose -f "$COMPOSE_FILE" build "${FILTERED_ARGS[@]}" --no-cache
+docker-compose -f "$COMPOSE_FILE" build "${FILTERED_ARGS[@]}" --no-cache --progress=plain

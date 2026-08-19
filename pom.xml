@@ -4,12 +4,32 @@
 
   <groupId>io.github.byzatic.tessera</groupId>
   <artifactId>tessera-dfe</artifactId>
-  <!--<version>0.1.5-SNAPSHOT</version>-->
   <version>0.1.5</version>
   <packaging>jar</packaging>
 
   <name>Tessera-DFE</name>
   <url>https://github.com/byzatic/Tessera-DFE</url>
+
+  <licenses>
+    <license>
+      <name>The Apache-2.0 License</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <repositories>
+    <repository>
+      <id>central-portal-snapshots</id>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
 
   <!-- manual set -->
   <properties>
@@ -24,7 +44,7 @@
     <version.prometheus_metrics>1.5.0</version.prometheus_metrics>
     <version.java_byzatic_commons>0.0.6</version.java_byzatic_commons>
     <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
-    <version.lib_tessera_dfe_project_io>0.0.1</version.lib_tessera_dfe_project_io>
+    <version.lib_tessera_dfe_project_io>0.0.2</version.lib_tessera_dfe_project_io>
     <!-- manual versions end -->
   </properties>
   <!-- manual set end -->
@@ -190,13 +210,6 @@
 
   </dependencies>
   <!-- manual set end -->
-
-  <repositories>
-    <repository>
-      <id>jitpack.io</id>
-      <url>https://jitpack.io</url>
-    </repository>
-  </repositories>
 
   <!-- manual set -->
   <build>
