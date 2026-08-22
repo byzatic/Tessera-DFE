@@ -44,7 +44,7 @@
     <version.prometheus_metrics>1.5.0</version.prometheus_metrics>
     <version.java_byzatic_commons>0.0.6</version.java_byzatic_commons>
     <version.tessera_workflow_toolkit>0.0.1</version.tessera_workflow_toolkit>
-    <version.lib_tessera_dfe_project_io>0.0.3-SNAPSHOT</version.lib_tessera_dfe_project_io>
+    <version.lib_tessera_dfe_project_io>0.0.3</version.lib_tessera_dfe_project_io>
     <!-- manual versions end -->
   </properties>
   <!-- manual set end -->
