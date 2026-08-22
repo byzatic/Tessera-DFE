@@ -1,57 +1,46 @@
 package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
-import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
-import io.github.byzatic.lib.configio.domain.exception.PluginLoadingException;
 import io.github.byzatic.lib.configio.unified.ProjectRuntimeSession;
 import io.github.byzatic.lib.configio.unified.ServiceCreationRequest;
 import io.github.byzatic.lib.configio.unified.TesseraProjectException;
+import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
 import io.github.byzatic.tessera.service.service.ServiceInterface;
 import io.github.byzatic.tessera.service.service.health.HealthFlagProxy;
 
 import java.util.Objects;
-import java.util.Set;
 
 /**
- * Adapts the unified runtime session to the service loader used by the engine.
+ * Creates services through the unified project runtime.
+ *
+ * <p>The owning {@code ProjectRevisionHandle} controls the runtime-session lifecycle.</p>
  */
-final class RuntimeServiceLoaderAdapter implements ServiceLoaderInterface {
+public final class UnifiedServiceFactory {
 
     private final ProjectRuntimeSession runtimeSession;
 
-    RuntimeServiceLoaderAdapter(ProjectRuntimeSession runtimeSession) {
+    public UnifiedServiceFactory(ProjectRuntimeSession runtimeSession) {
         this.runtimeSession = Objects.requireNonNull(runtimeSession, "runtimeSession");
     }
 
-    @Override
-    public ServiceInterface getService(
-            String serviceClassName,
+    public ServiceInterface create(
+            String serviceName,
             MCg3ServiceApiInterface serviceApi,
-            HealthFlagProxy healthFlagProxy
-    ) throws PluginLoadingException {
+            HealthFlagProxy health
+    ) throws OperationIncompleteException {
         try {
             return runtimeSession.createService(
                     ServiceCreationRequest.newBuilder()
-                            .serviceName(serviceClassName)
+                            .serviceName(serviceName)
                             .api(serviceApi)
-                            .health(healthFlagProxy)
+                            .health(health)
                             .build()
             );
         } catch (TesseraProjectException exception) {
-            throw new PluginLoadingException(
-                    "Cannot create service " + serviceClassName,
+            throw new OperationIncompleteException(
+                    "Cannot create service " + serviceName,
                     exception
             );
         }
-    }
-
-    @Override
-    public Set<String> getAvailableServiceNames() {
-        return runtimeSession.getAvailableServiceNames();
-    }
-
-    @Override
-    public void close() {
-        // The project revision handle owns and closes the runtime session.
     }
 }

@@ -1,7 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
-import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
-import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntime;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFailureListener;
@@ -32,8 +30,6 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
     private final String revisionId;
     private final OrchestrationServiceInterface orchestrationService;
     private final StorageManagerInterface storageManager;
-    private final ModuleLoaderInterface moduleLoader;
-    private final ServiceLoaderInterface serviceLoader;
     private final ExecutorService orchestrationExecutor;
     private final AtomicReference<Throwable> executionFailure = new AtomicReference<Throwable>();
     private final AtomicReference<ProjectRuntimeFailureListener> failureListener =
@@ -44,9 +40,7 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
     public DefaultProjectRuntime(
             String revisionId,
             OrchestrationServiceInterface orchestrationService,
-            StorageManagerInterface storageManager,
-            ModuleLoaderInterface moduleLoader,
-            ServiceLoaderInterface serviceLoader
+            StorageManagerInterface storageManager
     ) {
         this.revisionId = Objects.requireNonNull(revisionId, "revisionId");
         this.orchestrationService = Objects.requireNonNull(
@@ -54,8 +48,6 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
                 "orchestrationService"
         );
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
-        this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
-        this.serviceLoader = Objects.requireNonNull(serviceLoader, "serviceLoader");
         this.orchestrationExecutor = Executors.newSingleThreadExecutor(
                 new OrchestrationThreadFactory(revisionId)
         );
@@ -116,7 +108,6 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
         awaitExecutor(shutdownTimeout);
         cleanupStorages();
         cleanupProjectMetrics();
-        closeLoaders();
     }
 
     @Override
@@ -140,19 +131,6 @@ public final class DefaultProjectRuntime implements ProjectRuntime {
         } catch (InterruptedException exception) {
             orchestrationExecutor.shutdownNow();
             Thread.currentThread().interrupt();
-        }
-    }
-
-    private void closeLoaders() {
-        try {
-            moduleLoader.close();
-        } catch (Exception exception) {
-            logger.error("Cannot close module loader for revision {}", revisionId, exception);
-        }
-        try {
-            serviceLoader.close();
-        } catch (Exception exception) {
-            logger.error("Cannot close service loader for revision {}", revisionId, exception);
         }
     }
 

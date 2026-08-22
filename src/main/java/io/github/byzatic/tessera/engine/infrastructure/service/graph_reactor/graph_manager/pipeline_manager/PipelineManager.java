@@ -1,8 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager;
 
 import io.github.byzatic.commons.schedulers.immediate.*;
-import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
-import io.github.byzatic.lib.configio.domain.exception.PluginLoadingException;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
@@ -11,6 +9,7 @@ import io.github.byzatic.tessera.engine.domain.model.node_pipeline.*;
 import io.github.byzatic.tessera.engine.domain.repository.FullProjectRepository;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.observability.PrometheusMetricsAgent;
+import io.github.byzatic.tessera.engine.infrastructure.runtime.UnifiedRoutineFactory;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_path_manager.PathManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.MCg3WorkflowRoutineApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.StorageApi;
@@ -51,7 +50,7 @@ public class PipelineManager implements PipelineManagerInterface {
     private final GraphNodeRef graphNodeRef;
     private final List<GraphNodeRef> pathToCurrentExecutionNodeRef;
     private final StorageManagerInterface storageManager;
-    private final ModuleLoaderInterface moduleLoader;
+    private final UnifiedRoutineFactory routineFactory;
     private final SupportPathResolver pathResolver;
     private final ExecutionContextFactoryInterface executionContextFactory;
     private final FullProjectRepository fullProjectRepository;
@@ -141,7 +140,7 @@ public class PipelineManager implements PipelineManagerInterface {
     public PipelineManager(GraphNodeRef graphNodeRef,
                            List<GraphNodeRef> pathToCurrentExecutionNodeRef,
                            FullProjectRepository fullProjectRepository,
-                           ModuleLoaderInterface moduleLoader,
+                           UnifiedRoutineFactory routineFactory,
                            StorageManagerInterface storageManager,
                            PathManagerInterface pathManagerInterface,
                            ExecutionContextFactoryInterface executionContextFactory,
@@ -151,7 +150,7 @@ public class PipelineManager implements PipelineManagerInterface {
         this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
         this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
         this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
-        this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
+        this.routineFactory = Objects.requireNonNull(routineFactory, "routineFactory");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -183,7 +182,7 @@ public class PipelineManager implements PipelineManagerInterface {
     public PipelineManager(GraphNodeRef graphNodeRef,
                            List<GraphNodeRef> pathToCurrentExecutionNodeRef,
                            FullProjectRepository fullProjectRepository,
-                           ModuleLoaderInterface moduleLoader,
+                           UnifiedRoutineFactory routineFactory,
                            StorageManagerInterface storageManager,
                            PathManagerInterface pathManagerInterface,
                            ExecutionContextFactoryInterface executionContextFactory) throws OperationIncompleteException {
@@ -191,7 +190,7 @@ public class PipelineManager implements PipelineManagerInterface {
         this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
         this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
         this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
-        this.moduleLoader = Objects.requireNonNull(moduleLoader, "moduleLoader");
+        this.routineFactory = Objects.requireNonNull(routineFactory, "routineFactory");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
 
@@ -289,15 +288,24 @@ public class PipelineManager implements PipelineManagerInterface {
 
                     HealthFlagProxy health = HealthFlagProxy.newBuilder().build();
 
-                    WorkflowRoutineInterface routine = moduleLoader.getModule(
+                    WorkflowRoutineInterface routine = routineFactory.create(
                             workerName,
                             MCg3WorkflowRoutineApi.newBuilder()
-                                    .setStorageApi(new StorageApi(storageManager, graphNodeRef, fullProjectRepository))
-                                    .setConfigurationParameters(cfg)
-                                    .setExecutionContext(executionContextFactory.getExecutionContext(
-                                            graphNodeRef, pathToCurrentExecutionNodeRef,
-                                            stage, worker, stageConsistency
+                                    .setStorageApi(new StorageApi(
+                                            storageManager,
+                                            graphNodeRef,
+                                            fullProjectRepository
                                     ))
+                                    .setConfigurationParameters(cfg)
+                                    .setExecutionContext(
+                                            executionContextFactory.getExecutionContext(
+                                                    graphNodeRef,
+                                                    pathToCurrentExecutionNodeRef,
+                                                    stage,
+                                                    worker,
+                                                    stageConsistency
+                                            )
+                                    )
                                     .build(),
                             health
                     );
@@ -336,9 +344,9 @@ public class PipelineManager implements PipelineManagerInterface {
                     }
                 }
 
-            } catch (PluginLoadingException exception) {
+            } catch (OperationIncompleteException exception) {
                 throw new OperationIncompleteException(
-                        "Cannot load workflow routine for stage " + stage.getStageId(),
+                        "Cannot create workflow routine for stage " + stage.getStageId(),
                         exception
                 );
             } catch (InterruptedException ie) {

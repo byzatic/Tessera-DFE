@@ -1,7 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
-import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
-import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
 import io.github.byzatic.lib.configio.unified.ProjectRevisionHandle;
 import io.github.byzatic.lib.configio.unified.ProjectRuntimeSession;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
@@ -44,13 +42,13 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
             Path projectDirectory = revision.getProjectDirectory();
             ProjectRuntimeSession runtimeSession = revision.openRuntime();
             ProjectRepository repository = createProjectRepository(runtimeSession);
-            ServiceLoaderInterface serviceLoader = createServiceLoader(runtimeSession);
-            ModuleLoaderInterface moduleLoader = createModuleLoader(runtimeSession);
+            UnifiedRoutineFactory routineFactory = createRoutineFactory(runtimeSession);
+            UnifiedServiceFactory serviceFactory = createServiceFactory(runtimeSession);
 
             StorageManagerInterface storageManager = createStorageManager(repository);
             PipelineManagerFactoryInterface pipelineManagerFactory = createPipelineManagerFactory(
                     repository,
-                    moduleLoader,
+                    routineFactory,
                     storageManager,
                     projectDirectory
             );
@@ -61,7 +59,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
             );
             ServicesManagerFactory servicesManagerFactory = createServicesManagerFactory(
                     repository,
-                    serviceLoader,
+                    serviceFactory,
                     storageManager
             );
             OrchestrationService orchestrationService = createOrchestrationService(
@@ -72,9 +70,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
             return createProjectRuntime(
                     revision.getRevisionId(),
                     orchestrationService,
-                    storageManager,
-                    moduleLoader,
-                    serviceLoader
+                    storageManager
             );
         } catch (Exception exception) {
             throw new OperationIncompleteException(
@@ -97,23 +93,27 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
     }
 
     /**
-     * Creates a compatibility adapter for project service factories.
+     * Creates the unified workflow-routine factory for this revision.
      *
      * @param runtimeSession project-scoped runtime resources
-     * @return service loader adapter owned by the revision runtime session
+     * @return workflow-routine factory backed by the unified runtime
      */
-    private ServiceLoaderInterface createServiceLoader(ProjectRuntimeSession runtimeSession) {
-        return new RuntimeServiceLoaderAdapter(runtimeSession);
+    private UnifiedRoutineFactory createRoutineFactory(
+            ProjectRuntimeSession runtimeSession
+    ) {
+        return new UnifiedRoutineFactory(runtimeSession);
     }
 
     /**
-     * Creates a compatibility adapter for workflow routine factories.
+     * Creates the unified service factory for this revision.
      *
      * @param runtimeSession project-scoped runtime resources
-     * @return module loader adapter owned by the revision runtime session
+     * @return service factory backed by the unified runtime
      */
-    private ModuleLoaderInterface createModuleLoader(ProjectRuntimeSession runtimeSession) {
-        return new RuntimeModuleLoaderAdapter(runtimeSession);
+    private UnifiedServiceFactory createServiceFactory(
+            ProjectRuntimeSession runtimeSession
+    ) {
+        return new UnifiedServiceFactory(runtimeSession);
     }
 
     /**
@@ -132,7 +132,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
      * Creates the pipeline construction graph used by graph execution.
      *
      * @param repository project repository
-     * @param moduleLoader workflow routine loader
+     * @param routineFactory workflow-routine factory for the revision
      * @param storageManager project storage manager
      * @param projectDirectory staged project root directory
      * @return pipeline manager factory for the revision
@@ -140,7 +140,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
      */
     private PipelineManagerFactoryInterface createPipelineManagerFactory(
             ProjectRepository repository,
-            ModuleLoaderInterface moduleLoader,
+            UnifiedRoutineFactory routineFactory,
             StorageManagerInterface storageManager,
             Path projectDirectory
     ) throws OperationIncompleteException {
@@ -152,7 +152,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
                 new ExecutionContextFactory(repository, graphPathManager);
         return new PipelineManagerFactory(
                 repository,
-                moduleLoader,
+                routineFactory,
                 storageManager,
                 pathManager,
                 executionContextFactory
@@ -182,16 +182,16 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
      * Creates the factory responsible for project service instances.
      *
      * @param repository project repository
-     * @param serviceLoader project service loader
+     * @param serviceFactory service factory for the revision
      * @param storageManager project storage manager
      * @return service manager factory for the revision
      */
     private ServicesManagerFactory createServicesManagerFactory(
             ProjectRepository repository,
-            ServiceLoaderInterface serviceLoader,
+            UnifiedServiceFactory serviceFactory,
             StorageManagerInterface storageManager
     ) {
-        return new ServicesManagerFactory(repository, serviceLoader, storageManager);
+        return new ServicesManagerFactory(repository, serviceFactory, storageManager);
     }
 
     /**
@@ -209,28 +209,22 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
     }
 
     /**
-     * Creates the lifecycle owner for all resources belonging to one project revision.
+     * Creates the lifecycle owner for execution resources belonging to one project revision.
      *
      * @param revisionId immutable revision identifier
      * @param orchestrationService project orchestration service
      * @param storageManager project storage manager
-     * @param moduleLoader project module loader
-     * @param serviceLoader project service loader
      * @return isolated project runtime
      */
     private ProjectRuntime createProjectRuntime(
             String revisionId,
             OrchestrationService orchestrationService,
-            StorageManagerInterface storageManager,
-            ModuleLoaderInterface moduleLoader,
-            ServiceLoaderInterface serviceLoader
+            StorageManagerInterface storageManager
     ) {
         return new DefaultProjectRuntime(
                 revisionId,
                 orchestrationService,
-                storageManager,
-                moduleLoader,
-                serviceLoader
+                storageManager
         );
     }
 

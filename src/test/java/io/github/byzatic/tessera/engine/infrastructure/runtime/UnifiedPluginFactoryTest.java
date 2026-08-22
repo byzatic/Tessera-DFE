@@ -14,14 +14,13 @@ import org.mockito.ArgumentCaptor;
 import static org.junit.Assert.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-public class RuntimeLoaderAdapterTest {
+public class UnifiedPluginFactoryTest {
 
     @Test
-    public void shouldCreateRoutineThroughRuntimeSession() throws Exception {
+    public void shouldCreateRoutineThroughUnifiedRuntime() throws Exception {
         ProjectRuntimeSession runtimeSession = mock(ProjectRuntimeSession.class);
         MCg3WorkflowRoutineApiInterface api = mock(MCg3WorkflowRoutineApiInterface.class);
         io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthFlagProxy health =
@@ -31,9 +30,9 @@ public class RuntimeLoaderAdapterTest {
         WorkflowRoutineInterface expected = mock(WorkflowRoutineInterface.class);
         when(runtimeSession.createRoutine(any(RoutineCreationRequest.class)))
                 .thenReturn(expected);
-        RuntimeModuleLoaderAdapter adapter = new RuntimeModuleLoaderAdapter(runtimeSession);
+        UnifiedRoutineFactory factory = new UnifiedRoutineFactory(runtimeSession);
 
-        WorkflowRoutineInterface actual = adapter.getModule("Routine", api, health);
+        WorkflowRoutineInterface actual = factory.create("Routine", api, health);
 
         assertSame(expected, actual);
         ArgumentCaptor<RoutineCreationRequest> request =
@@ -41,21 +40,19 @@ public class RuntimeLoaderAdapterTest {
         verify(runtimeSession).createRoutine(request.capture());
         assertSame(api, request.getValue().getApi());
         assertSame(health, request.getValue().getHealth());
-        adapter.close();
-        verify(runtimeSession, never()).close();
     }
 
     @Test
-    public void shouldCreateServiceThroughRuntimeSession() throws Exception {
+    public void shouldCreateServiceThroughUnifiedRuntime() throws Exception {
         ProjectRuntimeSession runtimeSession = mock(ProjectRuntimeSession.class);
         MCg3ServiceApiInterface api = mock(MCg3ServiceApiInterface.class);
         HealthFlagProxy health = HealthFlagProxy.newBuilder().build();
         ServiceInterface expected = mock(ServiceInterface.class);
         when(runtimeSession.createService(any(ServiceCreationRequest.class)))
                 .thenReturn(expected);
-        RuntimeServiceLoaderAdapter adapter = new RuntimeServiceLoaderAdapter(runtimeSession);
+        UnifiedServiceFactory factory = new UnifiedServiceFactory(runtimeSession);
 
-        ServiceInterface actual = adapter.getService("Service", api, health);
+        ServiceInterface actual = factory.create("Service", api, health);
 
         assertSame(expected, actual);
         ArgumentCaptor<ServiceCreationRequest> request =
@@ -63,7 +60,5 @@ public class RuntimeLoaderAdapterTest {
         verify(runtimeSession).createService(request.capture());
         assertSame(api, request.getValue().getApi());
         assertSame(health, request.getValue().getHealth());
-        adapter.close();
-        verify(runtimeSession, never()).close();
     }
 }

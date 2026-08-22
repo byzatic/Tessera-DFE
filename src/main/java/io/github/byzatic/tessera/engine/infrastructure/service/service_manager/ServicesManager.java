@@ -1,7 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager;
 
 import io.github.byzatic.commons.schedulers.immediate.*;
-import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.commons.logging.MdcServiceContext;
 import io.github.byzatic.tessera.engine.domain.model.project.ServiceItem;
@@ -14,6 +13,7 @@ import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.d
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface.ExecutionContext;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface.MCg3ServiceApi;
 import io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface.StorageApi;
+import io.github.byzatic.tessera.engine.infrastructure.runtime.UnifiedServiceFactory;
 import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
 import io.github.byzatic.tessera.service.configuration.ServiceConfigurationParameter;
 import io.github.byzatic.tessera.service.execution_context.ExecutionContextInterface;
@@ -43,7 +43,7 @@ public class ServicesManager implements ServicesManagerInterface {
 
     private static final Logger logger = LoggerFactory.getLogger(ServicesManager.class);
 
-    private final ServiceLoaderInterface serviceLoader;
+    private final UnifiedServiceFactory serviceFactory;
     private final StorageManagerInterface storageManager;
     private final ImmediateSchedulerInterface scheduler;
 
@@ -77,12 +77,12 @@ public class ServicesManager implements ServicesManagerInterface {
     // ========= Конструктор №1: с внешним шедуллером =========
     public ServicesManager(
             FullProjectRepository fullProjectRepository,
-            ServiceLoaderInterface serviceLoader,
+            UnifiedServiceFactory serviceFactory,
             StorageManagerInterface storageManager,
             ImmediateSchedulerInterface scheduler,
             JobEventListener... listeners // optional: pass from business logic
     ) {
-        this.serviceLoader = Objects.requireNonNull(serviceLoader, "serviceLoader");
+        this.serviceFactory = Objects.requireNonNull(serviceFactory, "serviceFactory");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -95,11 +95,11 @@ public class ServicesManager implements ServicesManagerInterface {
     // ========= Конструктор №2: без шедуллера — создаём свой =========
     public ServicesManager(
             FullProjectRepository fullProjectRepository,
-            ServiceLoaderInterface serviceLoader,
+            UnifiedServiceFactory serviceFactory,
             StorageManagerInterface storageManager,
             JobEventListener... listeners // optional
     ) {
-        this.serviceLoader = Objects.requireNonNull(serviceLoader, "serviceLoader");
+        this.serviceFactory = Objects.requireNonNull(serviceFactory, "serviceFactory");
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         // Создаём дефолтный ImmediateScheduler через Builder (пул потоков и grace по умолчанию)
@@ -230,7 +230,7 @@ public class ServicesManager implements ServicesManagerInterface {
                         .serviceConfigurationParameters(params)
                         .build();
 
-                ServiceInterface service = serviceLoader.getService(
+                ServiceInterface service = serviceFactory.create(
                         sd.getServiceName(),
                         serviceApi,
                         HealthFlagProxy.newBuilder().build()
