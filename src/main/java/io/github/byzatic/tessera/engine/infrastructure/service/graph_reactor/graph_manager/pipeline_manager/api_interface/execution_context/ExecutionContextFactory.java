@@ -17,15 +17,12 @@ import io.github.byzatic.tessera.workflowroutine.execution_context.PipelineExecu
 import io.github.byzatic.tessera.workflowroutine.execution_context.StorageDescriptionInterface;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ExecutionContextFactory implements ExecutionContextFactoryInterface {
 
     private final FullProjectRepository fullProjectRepository;
-    private final Map<GraphNodeRef, ExecutionContextInterface> executionContextInterfaceMap = new HashMap<>();
     private final GraphPathManagerInterface graphPathManager;
 
     public ExecutionContextFactory(FullProjectRepository fullProjectRepository, GraphPathManagerInterface graphPathManager) {
@@ -36,13 +33,13 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
     @Override
     public synchronized ExecutionContextInterface getExecutionContext(GraphNodeRef graphNodeRef, List<GraphNodeRef> pathToCurrentExecutionNodeRef, StagesDescriptionItem stagesDescriptionItem, WorkersDescriptionItem workersDescriptionItem, StagesConsistencyItem stagesConsistencyItem) throws OperationIncompleteException {
         try {
-            ExecutionContextInterface result;
-            if (executionContextInterfaceMap.containsKey(graphNodeRef)) {
-                result = executionContextInterfaceMap.get(graphNodeRef);
-            } else {
-                result = create(graphNodeRef, pathToCurrentExecutionNodeRef, stagesDescriptionItem, workersDescriptionItem, stagesConsistencyItem);
-            }
-            return result;
+            return create(
+                    graphNodeRef,
+                    pathToCurrentExecutionNodeRef,
+                    stagesDescriptionItem,
+                    workersDescriptionItem,
+                    stagesConsistencyItem
+            );
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
         }
@@ -125,8 +122,6 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
                     .setMdcContext(mdcContext)
                     .build();
 
-            executionContextInterfaceMap.put(graphNodeRef, result);
-
             return result;
         } catch (Exception e) {
             throw new OperationIncompleteException(e);
@@ -135,7 +130,7 @@ public class ExecutionContextFactory implements ExecutionContextFactoryInterface
 
     @Override
     public synchronized void reload() {
-        executionContextInterfaceMap.clear();
+        // Execution contexts are invocation-specific and are not cached.
     }
 
 

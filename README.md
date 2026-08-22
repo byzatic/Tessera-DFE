@@ -347,6 +347,8 @@ To shut down the development environment:
 
 Runtime behavior is primarily controlled through environment variables defined in the compose files. These variables are translated into JVM system properties inside the container. If a variable is not defined, the corresponding `-D` option is not added to the JVM command line. Heap configuration is controlled using `XMS` and `XMX`, which map to `-Xms` and `-Xmx`. The maximum heap size must be chosen carefully based on available container memory to avoid out-of-memory conditions or aggressive garbage collection.
 
+Logback uses the `logback.xml` bundled in the application JAR by default. To override it, mount an external configuration file and set `LOGBACK_CONFIG_PATH` to its path inside the container. The entrypoint adds `-Dlogback.configurationFile` only when that file exists; otherwise it reports a warning and falls back to the bundled configuration. File watching may be enabled in the external configuration with `scan="true"`, while the bundled classpath configuration is intentionally not watched.
+
 The entrypoint only translates environment variables into JVM system properties. ZIP observation, staging, validation, project shutdown, activation, and rollback are implemented inside the application with `lib-tessera-dfe-config-io`.
 
 From an operational perspective, production-like mode is recommended when running stable project configurations where hot reloading via directory watch is required. Development mode is recommended when actively modifying engine code, experimenting with JVM parameters, or collecting diagnostic data using JFR.
