@@ -11,6 +11,13 @@ import io.github.byzatic.lib.configio.domain.model.ProjectLoadResultDataObject;
 import io.github.byzatic.lib.configio.domain.model.ProjectStructureDataObject;
 import io.github.byzatic.lib.configio.domain.model.SharedResourcesContainerDataObject;
 import io.github.byzatic.lib.configio.domain.model.StageConsistencyDataObject;
+import io.github.byzatic.lib.configio.unified.model.NodeConfiguration;
+import io.github.byzatic.lib.configio.unified.model.NodeId;
+import io.github.byzatic.lib.configio.unified.model.Pipeline;
+import io.github.byzatic.lib.configio.unified.model.PipelineStage;
+import io.github.byzatic.lib.configio.unified.model.ProjectConfiguration;
+import io.github.byzatic.lib.configio.unified.model.ProjectNode;
+import io.github.byzatic.lib.configio.unified.model.TesseraProject;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import org.junit.Rule;
 import org.junit.Test;
@@ -25,6 +32,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 public class ProjectRepositoryImplTest {
 
@@ -53,6 +61,46 @@ public class ProjectRepositoryImplTest {
                     .getStagesConsistency().size());
             assertNotNull(repository.getSharedResourcesClassLoader());
         }
+    }
+
+    @Test
+    public void shouldMapUnifiedProjectToRepositoryState() throws Exception {
+        NodeId nodeId = NodeId.newBuilder().value(NODE_UUID).build();
+        Pipeline pipeline = Pipeline.newBuilder()
+                .stages(List.of(
+                        PipelineStage.newBuilder()
+                                .id("stage-id")
+                                .position(1)
+                                .workers(List.of())
+                                .build()
+                ))
+                .build();
+        ProjectNode node = ProjectNode.newBuilder()
+                .nodeId(nodeId)
+                .id("node-id")
+                .name("Test node")
+                .description("Unified repository fixture")
+                .downstream(List.of())
+                .configuration(NodeConfiguration.newBuilder().build())
+                .pipeline(pipeline)
+                .build();
+        TesseraProject project = TesseraProject.newBuilder()
+                .formatVersion("v1")
+                .name("test-project")
+                .configuration(ProjectConfiguration.newBuilder().build())
+                .nodes(Map.of(nodeId, node))
+                .build();
+
+        ProjectRepositoryImpl repository = new ProjectRepositoryImpl(project);
+
+        List<GraphNodeRef> nodeReferences = repository.listGraphNodeRef();
+        assertEquals(1, nodeReferences.size());
+        GraphNodeRef nodeReference = nodeReferences.get(0);
+        assertEquals(NODE_UUID, nodeReference.getNodeUUID());
+        assertNotNull(repository.getNode(nodeReference));
+        assertEquals(1, repository.getPipeline(nodeReference)
+                .getStagesConsistency().size());
+        assertNull(repository.getSharedResourcesClassLoader());
     }
 
     private ProjectLoadResultDataObject createLoadedProject(Path projectDirectory) {

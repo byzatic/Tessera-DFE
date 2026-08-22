@@ -1,11 +1,9 @@
 package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
 import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevision;
 import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
-import io.github.byzatic.lib.configio.domain.exception.PluginLoadingException;
-import io.github.byzatic.lib.configio.infrastructure.factory.ModuleLoaderFactory;
-import io.github.byzatic.lib.configio.infrastructure.factory.ServiceLoaderFactory;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionHandle;
+import io.github.byzatic.lib.configio.unified.ProjectRuntimeSession;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntime;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFactory;
@@ -38,19 +36,16 @@ import java.util.Objects;
 public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory {
 
     @Override
-    public ProjectRuntime create(ProjectRevision revision)
+    public ProjectRuntime create(ProjectRevisionHandle revision)
             throws OperationIncompleteException {
         Objects.requireNonNull(revision, "revision");
 
-        ModuleLoaderInterface moduleLoader = null;
-        ServiceLoaderInterface serviceLoader = null;
         try {
             Path projectDirectory = revision.getProjectDirectory();
-            ProjectRepository repository = createProjectRepository(revision);
-            ClassLoader sharedResourcesClassLoader = repository.getSharedResourcesClassLoader();
-
-            serviceLoader = createServiceLoader(projectDirectory, sharedResourcesClassLoader);
-            moduleLoader = createModuleLoader(projectDirectory, sharedResourcesClassLoader);
+            ProjectRuntimeSession runtimeSession = revision.openRuntime();
+            ProjectRepository repository = createProjectRepository(runtimeSession);
+            ServiceLoaderInterface serviceLoader = createServiceLoader(runtimeSession);
+            ModuleLoaderInterface moduleLoader = createModuleLoader(runtimeSession);
 
             StorageManagerInterface storageManager = createStorageManager(repository);
             PipelineManagerFactoryInterface pipelineManagerFactory = createPipelineManagerFactory(
@@ -82,7 +77,6 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
                     serviceLoader
             );
         } catch (Exception exception) {
-            closeAfterFailure(moduleLoader, serviceLoader, exception);
             throw new OperationIncompleteException(
                     "Cannot create runtime for revision " + revision.getRevisionId(),
                     exception
@@ -93,47 +87,33 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
     /**
      * Creates the repository backed by the project data already loaded for the revision.
      *
-     * @param revision prepared project revision
+     * @param runtimeSession prepared project runtime session
      * @return repository for the revision
      * @throws OperationIncompleteException when the loaded project cannot be mapped
      */
-    private ProjectRepository createProjectRepository(ProjectRevision revision)
+    private ProjectRepository createProjectRepository(ProjectRuntimeSession runtimeSession)
             throws OperationIncompleteException {
-        return new ProjectRepositoryImpl(revision.getProject());
+        return new ProjectRepositoryImpl(runtimeSession.getProject());
     }
 
     /**
-     * Creates the service loader for the staged project directory.
+     * Creates a compatibility adapter for project service factories.
      *
-     * @param projectDirectory project root directory
-     * @param sharedResourcesClassLoader class loader containing project shared resources
-     * @return service loader owned by the project runtime
-     * @throws PluginLoadingException when service discovery cannot be initialized
+     * @param runtimeSession project-scoped runtime resources
+     * @return service loader adapter owned by the revision runtime session
      */
-    private ServiceLoaderInterface createServiceLoader(
-            Path projectDirectory,
-            ClassLoader sharedResourcesClassLoader
-    ) throws PluginLoadingException {
-        Path servicesDirectory = projectDirectory.resolve("modules").resolve("services");
-        return ServiceLoaderFactory.create(servicesDirectory, sharedResourcesClassLoader);
+    private ServiceLoaderInterface createServiceLoader(ProjectRuntimeSession runtimeSession) {
+        return new RuntimeServiceLoaderAdapter(runtimeSession);
     }
 
     /**
-     * Creates the workflow routine loader for the staged project directory.
+     * Creates a compatibility adapter for workflow routine factories.
      *
-     * @param projectDirectory project root directory
-     * @param sharedResourcesClassLoader class loader containing project shared resources
-     * @return module loader owned by the project runtime
-     * @throws PluginLoadingException when module discovery cannot be initialized
+     * @param runtimeSession project-scoped runtime resources
+     * @return module loader adapter owned by the revision runtime session
      */
-    private ModuleLoaderInterface createModuleLoader(
-            Path projectDirectory,
-            ClassLoader sharedResourcesClassLoader
-    ) throws PluginLoadingException {
-        Path modulesDirectory = projectDirectory
-                .resolve("modules")
-                .resolve("workflow_routines");
-        return ModuleLoaderFactory.create(modulesDirectory, sharedResourcesClassLoader);
+    private ModuleLoaderInterface createModuleLoader(ProjectRuntimeSession runtimeSession) {
+        return new RuntimeModuleLoaderAdapter(runtimeSession);
     }
 
     /**
@@ -254,31 +234,4 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
         );
     }
 
-    /**
-     * Closes loaders created before a runtime construction failure.
-     *
-     * @param moduleLoader module loader, or {@code null} when it was not created
-     * @param serviceLoader service loader, or {@code null} when it was not created
-     * @param failure construction failure receiving suppressed cleanup errors
-     */
-    private void closeAfterFailure(
-            ModuleLoaderInterface moduleLoader,
-            ServiceLoaderInterface serviceLoader,
-            Throwable failure
-    ) {
-        if (moduleLoader != null) {
-            try {
-                moduleLoader.close();
-            } catch (Exception exception) {
-                failure.addSuppressed(exception);
-            }
-        }
-        if (serviceLoader != null) {
-            try {
-                serviceLoader.close();
-            } catch (Exception exception) {
-                failure.addSuppressed(exception);
-            }
-        }
-    }
 }

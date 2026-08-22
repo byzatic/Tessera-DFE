@@ -1,6 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository;
 
 import io.github.byzatic.lib.configio.domain.model.ProjectLoadResultDataObject;
+import io.github.byzatic.lib.configio.unified.model.TesseraProject;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
@@ -40,6 +41,22 @@ public final class ProjectRepositoryImpl implements ProjectRepository {
         }
         this.projectConfigurationMapper = new ProjectConfigurationMapper();
         applyState(loadedProject);
+    }
+
+    /**
+     * Creates repository state from the detached unified project model.
+     *
+     * <p>Runtime resources and their class loaders remain owned by the project runtime
+     * session and are not retained by this repository.</p>
+     *
+     * @param project immutable project configuration
+     */
+    public ProjectRepositoryImpl(TesseraProject project) {
+        if (project == null) {
+            throw new IllegalArgumentException("project must not be null");
+        }
+        this.projectConfigurationMapper = new ProjectConfigurationMapper();
+        applyState(project);
     }
 
     @Override
@@ -97,6 +114,13 @@ public final class ProjectRepositoryImpl implements ProjectRepository {
     }
 
     private void applyState(ProjectLoadResultDataObject source) {
+        ProjectRepositoryStateDataObject state = projectConfigurationMapper.map(source);
+        sharedResourcesContainer = state.getSharedResourcesContainer();
+        nodeContainer = state.getNodeContainer();
+        globalContainer = state.getGlobalContainer();
+    }
+
+    private void applyState(TesseraProject source) {
         ProjectRepositoryStateDataObject state = projectConfigurationMapper.map(source);
         sharedResourcesContainer = state.getSharedResourcesContainer();
         nodeContainer = state.getNodeContainer();

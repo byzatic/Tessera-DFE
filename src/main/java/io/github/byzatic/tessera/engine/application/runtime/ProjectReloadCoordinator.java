@@ -1,10 +1,12 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
-import io.github.byzatic.lib.configio.application.revision.ProjectRevision;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevisionFailure;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevisionListener;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevisionSource;
-import io.github.byzatic.lib.configio.domain.exception.ProjectRevisionException;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionError;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionHandle;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionListener;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionSubscription;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionWatchRequest;
+import io.github.byzatic.lib.configio.unified.TesseraProjectException;
+import io.github.byzatic.lib.configio.unified.TesseraProjectIO;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +35,8 @@ public final class ProjectReloadCoordinator
     private static final Logger logger =
             LoggerFactory.getLogger(ProjectReloadCoordinator.class);
 
-    private final ProjectRevisionSource revisionSource;
+    private final TesseraProjectIO projectIO;
+    private final ProjectRevisionWatchRequest watchRequest;
     private final ProjectRuntimeFactory runtimeFactory;
     private final Duration startupTimeout;
     private final Duration shutdownTimeout;
@@ -41,22 +44,25 @@ public final class ProjectReloadCoordinator
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean revisionDrainScheduled = new AtomicBoolean(false);
-    private final AtomicReference<ProjectRevision> pendingRevision =
-            new AtomicReference<ProjectRevision>();
+    private final AtomicReference<ProjectRevisionHandle> pendingRevision =
+            new AtomicReference<ProjectRevisionHandle>();
     private final AtomicReference<Throwable> terminalFailure =
             new AtomicReference<Throwable>();
     private final CountDownLatch terminated = new CountDownLatch(1);
 
+    private volatile ProjectRevisionSubscription revisionSubscription;
     private ProjectRuntime activeRuntime;
-    private ProjectRevision activeRevision;
+    private ProjectRevisionHandle activeRevision;
 
     public ProjectReloadCoordinator(
-            ProjectRevisionSource revisionSource,
+            TesseraProjectIO projectIO,
+            ProjectRevisionWatchRequest watchRequest,
             ProjectRuntimeFactory runtimeFactory,
             Duration startupTimeout,
             Duration shutdownTimeout
     ) {
-        this.revisionSource = Objects.requireNonNull(revisionSource, "revisionSource");
+        this.projectIO = Objects.requireNonNull(projectIO, "projectIO");
+        this.watchRequest = Objects.requireNonNull(watchRequest, "watchRequest");
         this.runtimeFactory = Objects.requireNonNull(runtimeFactory, "runtimeFactory");
         this.startupTimeout = Objects.requireNonNull(startupTimeout, "startupTimeout");
         this.shutdownTimeout = Objects.requireNonNull(shutdownTimeout, "shutdownTimeout");
@@ -66,13 +72,17 @@ public final class ProjectReloadCoordinator
     /**
      * Starts project revision observation.
      *
-     * @throws ProjectRevisionException when the source cannot be started
+     * @throws TesseraProjectException when revision observation cannot be started
      */
-    public void start() throws ProjectRevisionException {
+    public void start() throws TesseraProjectException {
         if (!started.compareAndSet(false, true)) {
             throw new IllegalStateException("Project reload coordinator is already started");
         }
-        revisionSource.start(this);
+        ProjectRevisionSubscription subscription = projectIO.watchRevisions(watchRequest, this);
+        revisionSubscription = subscription;
+        if (closed.get()) {
+            subscription.close();
+        }
     }
 
     /**
@@ -93,13 +103,13 @@ public final class ProjectReloadCoordinator
     }
 
     @Override
-    public void onRevisionAvailable(final ProjectRevision revision) {
+    public void onRevisionAvailable(final ProjectRevisionHandle revision) {
         Objects.requireNonNull(revision, "revision");
         if (closed.get()) {
             closeRevision(revision, null);
             return;
         }
-        ProjectRevision superseded = pendingRevision.getAndSet(revision);
+        ProjectRevisionHandle superseded = pendingRevision.getAndSet(revision);
         closeRevision(superseded, null);
         scheduleRevisionDrain();
     }
@@ -112,13 +122,13 @@ public final class ProjectReloadCoordinator
             reloadExecutor.execute(new RevisionDrainCommand());
         } catch (RejectedExecutionException exception) {
             revisionDrainScheduled.set(false);
-            ProjectRevision rejected = pendingRevision.getAndSet(null);
+            ProjectRevisionHandle rejected = pendingRevision.getAndSet(null);
             closeRevision(rejected, exception);
         }
     }
 
     @Override
-    public void onRevisionRejected(ProjectRevisionFailure failure) {
+    public void onRevisionRejected(ProjectRevisionError failure) {
         logger.error(
                 "Project archive revision {} was rejected",
                 failure.getRevisionId(),
@@ -132,7 +142,7 @@ public final class ProjectReloadCoordinator
             return;
         }
 
-        revisionSource.close();
+        closeRevisionSubscription();
         reloadExecutor.shutdown();
         try {
             if (!reloadExecutor.awaitTermination(
@@ -150,7 +160,7 @@ public final class ProjectReloadCoordinator
         terminated.countDown();
     }
 
-    private void activate(ProjectRevision revision) {
+    private void activate(ProjectRevisionHandle revision) {
         if (activeRevision != null
                 && activeRevision.getRevisionId().equals(revision.getRevisionId())) {
             closeRevision(revision, null);
@@ -173,7 +183,7 @@ public final class ProjectReloadCoordinator
         }
 
         ProjectRuntime previousRuntime = activeRuntime;
-        ProjectRevision previousRevision = activeRevision;
+        ProjectRevisionHandle previousRevision = activeRevision;
         activeRuntime = null;
         activeRevision = null;
 
@@ -244,13 +254,13 @@ public final class ProjectReloadCoordinator
                     failedRuntime.getRevisionId(),
                     failure
             );
-            revisionSource.close();
+            closeRevisionSubscription();
             stopAndCloseActiveRuntime();
             terminated.countDown();
         }
     }
 
-    private void startInitialRuntime(ProjectRuntime runtime, ProjectRevision revision) {
+    private void startInitialRuntime(ProjectRuntime runtime, ProjectRevisionHandle revision) {
         try {
             runtime.start(startupTimeout);
             activeRuntime = runtime;
@@ -266,7 +276,7 @@ public final class ProjectReloadCoordinator
 
     private void rollback(
             ProjectRuntime stoppedRuntime,
-            ProjectRevision previousRevision,
+            ProjectRevisionHandle previousRevision,
             Throwable reloadFailure
     ) {
         closeRuntime(stoppedRuntime);
@@ -289,7 +299,7 @@ public final class ProjectReloadCoordinator
 
     private void stopAndCloseActiveRuntime() {
         ProjectRuntime runtime = activeRuntime;
-        ProjectRevision revision = activeRevision;
+        ProjectRevisionHandle revision = activeRevision;
         activeRuntime = null;
         activeRevision = null;
         if (runtime != null) {
@@ -307,7 +317,7 @@ public final class ProjectReloadCoordinator
         }
     }
 
-    private void closeRevision(ProjectRevision revision, Throwable failure) {
+    private void closeRevision(ProjectRevisionHandle revision, Throwable failure) {
         if (revision == null) {
             return;
         }
@@ -321,10 +331,17 @@ public final class ProjectReloadCoordinator
         }
     }
 
+    private void closeRevisionSubscription() {
+        ProjectRevisionSubscription currentSubscription = revisionSubscription;
+        if (currentSubscription != null) {
+            currentSubscription.close();
+        }
+    }
+
     private final class RevisionDrainCommand implements Runnable {
         @Override
         public void run() {
-            ProjectRevision revision;
+            ProjectRevisionHandle revision;
             while ((revision = pendingRevision.getAndSet(null)) != null) {
                 if (closed.get()) {
                     closeRevision(revision, null);

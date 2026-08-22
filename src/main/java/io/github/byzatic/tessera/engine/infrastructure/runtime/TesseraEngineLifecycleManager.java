@@ -4,9 +4,9 @@ import io.github.byzatic.commons.schedulers.immediate.CancellationToken;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.Task;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevisionSource;
-import io.github.byzatic.lib.configio.infrastructure.factory.ProjectRevisionSourceFactory;
-import io.github.byzatic.lib.configio.infrastructure.revision.ZipProjectRevisionSourceConfiguration;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionWatchRequest;
+import io.github.byzatic.lib.configio.unified.TesseraProjectIO;
+import io.github.byzatic.lib.configio.unified.internal.DefaultTesseraProjectIO;
 import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectReloadCoordinator;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFactory;
@@ -71,13 +71,12 @@ public final class TesseraEngineLifecycleManager implements AutoCloseable {
      * @return lifecycle manager configured from {@link Configuration}
      */
     public static TesseraEngineLifecycleManager createDefault() {
-        ZipProjectRevisionSourceConfiguration sourceConfiguration =
-                createRevisionSourceConfiguration();
-        ProjectRevisionSource revisionSource =
-                ProjectRevisionSourceFactory.create(sourceConfiguration);
+        TesseraProjectIO projectIO = DefaultTesseraProjectIO.createDefault();
+        ProjectRevisionWatchRequest watchRequest = createRevisionWatchRequest();
         ProjectRuntimeFactory runtimeFactory = new DefaultProjectRuntimeFactory();
         ProjectReloadCoordinator reloadCoordinator = new ProjectReloadCoordinator(
-                revisionSource,
+                projectIO,
+                watchRequest,
                 runtimeFactory,
                 Configuration.PROJECT_STARTUP_TIMEOUT,
                 Configuration.PROJECT_SHUTDOWN_TIMEOUT
@@ -157,12 +156,13 @@ public final class TesseraEngineLifecycleManager implements AutoCloseable {
     /**
      * Builds ZIP observation settings from process configuration.
      *
-     * @return project revision source configuration
+     * @return unified project revision watch request
      */
-    private static ZipProjectRevisionSourceConfiguration createRevisionSourceConfiguration() {
-        return ZipProjectRevisionSourceConfiguration.newBuilder()
-                .sourceArchive(Configuration.PROJECT_ARCHIVE_PATH)
-                .stagingDirectory(Configuration.PROJECT_STAGING_DIRECTORY)
+    private static ProjectRevisionWatchRequest createRevisionWatchRequest() {
+        return ProjectRevisionWatchRequest.builder(
+                        Configuration.PROJECT_ARCHIVE_PATH,
+                        Configuration.PROJECT_STAGING_DIRECTORY
+                )
                 .pollInterval(Configuration.PROJECT_WATCH_INTERVAL)
                 .build();
     }

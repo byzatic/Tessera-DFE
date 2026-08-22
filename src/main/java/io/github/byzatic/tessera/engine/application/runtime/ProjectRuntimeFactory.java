@@ -1,6 +1,6 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
-import io.github.byzatic.lib.configio.application.revision.ProjectRevision;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionHandle;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 
 /**
@@ -15,5 +15,5 @@ public interface ProjectRuntimeFactory {
      * @return isolated runtime for the revision
      * @throws OperationIncompleteException when runtime resources cannot be prepared
      */
-    ProjectRuntime create(ProjectRevision revision) throws OperationIncompleteException;
+    ProjectRuntime create(ProjectRevisionHandle revision) throws OperationIncompleteException;
 }

@@ -1,26 +1,27 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
-import io.github.byzatic.lib.configio.application.revision.ProjectRevision;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevisionListener;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevisionSource;
-import io.github.byzatic.lib.configio.domain.exception.ProjectRevisionException;
-import io.github.byzatic.lib.configio.domain.model.NodeContainerDataObject;
-import io.github.byzatic.lib.configio.domain.model.ProjectDataObject;
-import io.github.byzatic.lib.configio.domain.model.ProjectGlobalDataObject;
-import io.github.byzatic.lib.configio.domain.model.ProjectLoadResultDataObject;
-import io.github.byzatic.lib.configio.domain.model.ProjectStructureDataObject;
-import io.github.byzatic.lib.configio.domain.model.SharedResourcesContainerDataObject;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionHandle;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionListener;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionSubscription;
+import io.github.byzatic.lib.configio.unified.ProjectRevisionWatchRequest;
+import io.github.byzatic.lib.configio.unified.ProjectRuntimeSession;
+import io.github.byzatic.lib.configio.unified.TesseraProjectException;
+import io.github.byzatic.lib.configio.unified.TesseraProjectIO;
+import io.github.byzatic.lib.configio.unified.model.ExportProjectRequest;
+import io.github.byzatic.lib.configio.unified.model.ProjectConfiguration;
+import io.github.byzatic.lib.configio.unified.model.SaveProjectRequest;
+import io.github.byzatic.lib.configio.unified.model.SaveProjectResult;
+import io.github.byzatic.lib.configio.unified.model.TesseraProject;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.net.URLClassLoader;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,23 +38,24 @@ public class ProjectReloadCoordinatorTest {
 
     @Test
     public void restoresPreviousRevisionWhenCandidateStartupFails() throws Exception {
-        StubRevisionSource source = new StubRevisionSource();
+        StubProjectIO projectIO = new StubProjectIO();
         StubRuntimeFactory factory = new StubRuntimeFactory();
         ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
-                source,
+                projectIO,
+                createWatchRequest(),
                 factory,
                 Duration.ofSeconds(2L),
                 Duration.ofSeconds(2L)
         );
-        ProjectRevision previous = createRevision("previous");
-        ProjectRevision candidate = createRevision("candidate");
+        ProjectRevisionHandle previous = createRevision("previous");
+        ProjectRevisionHandle candidate = createRevision("candidate");
 
         try {
             coordinator.start();
-            source.publish(previous);
+            projectIO.publish(previous);
             assertTrue(factory.initialRuntime.awaitStarted());
 
-            source.publish(candidate);
+            projectIO.publish(candidate);
             assertTrue(factory.rollbackRuntime.awaitStarted());
 
             assertTrue(factory.initialRuntime.getStopCount() == 1);
@@ -70,20 +72,21 @@ public class ProjectReloadCoordinatorTest {
 
     @Test
     public void terminatesWhenActiveRuntimeReportsFatalFailure() throws Exception {
-        StubRevisionSource source = new StubRevisionSource();
+        StubProjectIO projectIO = new StubProjectIO();
         StubRuntimeFactory factory = new StubRuntimeFactory();
         ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
-                source,
+                projectIO,
+                createWatchRequest(),
                 factory,
                 Duration.ofSeconds(2L),
                 Duration.ofSeconds(2L)
         );
-        ProjectRevision revision = createRevision("previous");
+        ProjectRevisionHandle revision = createRevision("previous");
         RuntimeException expectedFailure = new RuntimeException("Expected runtime failure");
 
         try {
             coordinator.start();
-            source.publish(revision);
+            projectIO.publish(revision);
             assertTrue(factory.initialRuntime.awaitStarted());
 
             factory.initialRuntime.fail(expectedFailure);
@@ -101,60 +104,137 @@ public class ProjectReloadCoordinatorTest {
         }
     }
 
-    private ProjectRevision createRevision(String revisionId) throws Exception {
+    private ProjectRevisionWatchRequest createWatchRequest() throws IOException {
+        Path sourceArchive = temporaryFolder.newFile("source.zip").toPath();
+        Path stagingDirectory = temporaryFolder.newFolder("staging").toPath();
+        return ProjectRevisionWatchRequest.builder(sourceArchive, stagingDirectory).build();
+    }
+
+    private ProjectRevisionHandle createRevision(String revisionId) throws Exception {
         Path revisionDirectory = temporaryFolder.newFolder(revisionId).toPath();
         Path projectDirectory = revisionDirectory.resolve("project");
         Files.createDirectories(projectDirectory);
-
-        ProjectDataObject projectData = new ProjectDataObject("v1", revisionId);
-        ProjectStructureDataObject projectStructure = new ProjectStructureDataObject(
-                projectData,
-                new HashMap<>()
-        );
-        NodeContainerDataObject nodes = new NodeContainerDataObject(
-                projectStructure,
-                new HashMap<>(),
-                new HashMap<>()
-        );
-        ProjectGlobalDataObject global = new ProjectGlobalDataObject(
-                new ArrayList<>(),
-                new ArrayList<>()
-        );
-        SharedResourcesContainerDataObject resources =
-                new SharedResourcesContainerDataObject(
-                        new ArrayList<ClassLoader>(),
-                        new ArrayList<URLClassLoader>()
-                );
-        ProjectLoadResultDataObject loadedProject = new ProjectLoadResultDataObject(
-                projectDirectory,
-                global,
-                nodes,
-                resources
-        );
-        return new ProjectRevision(
+        TesseraProject project = TesseraProject.newBuilder()
+                .formatVersion("v1")
+                .name(revisionId)
+                .configuration(ProjectConfiguration.newBuilder().build())
+                .nodes(Map.of())
+                .build();
+        return new StubProjectRevision(
                 revisionId,
                 revisionDirectory.resolve("source.zip"),
                 projectDirectory,
-                revisionDirectory,
-                loadedProject
+                project
         );
     }
 
-    private static final class StubRevisionSource implements ProjectRevisionSource {
+    private static final class StubProjectIO implements TesseraProjectIO {
 
         private ProjectRevisionListener listener;
 
         @Override
-        public void start(ProjectRevisionListener value) throws ProjectRevisionException {
+        public TesseraProject loadProject(Path projectDirectory) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public SaveProjectResult saveProject(SaveProjectRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Path exportProject(ExportProjectRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ProjectRuntimeSession openRuntime(Path projectDirectory) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ProjectRevisionSubscription watchRevisions(
+                ProjectRevisionWatchRequest request,
+                ProjectRevisionListener value
+        ) {
             listener = value;
+            return new StubRevisionSubscription();
+        }
+
+        private void publish(ProjectRevisionHandle revision) {
+            listener.onRevisionAvailable(revision);
+        }
+    }
+
+    private static final class StubRevisionSubscription
+            implements ProjectRevisionSubscription {
+
+        private boolean closed;
+
+        @Override
+        public boolean isClosed() {
+            return closed;
         }
 
         @Override
         public void close() {
+            closed = true;
+        }
+    }
+
+    private static final class StubProjectRevision implements ProjectRevisionHandle {
+
+        private final String revisionId;
+        private final Path sourceArchive;
+        private final Path projectDirectory;
+        private final TesseraProject project;
+        private boolean closed;
+
+        private StubProjectRevision(
+                String revisionId,
+                Path sourceArchive,
+                Path projectDirectory,
+                TesseraProject project
+        ) {
+            this.revisionId = revisionId;
+            this.sourceArchive = sourceArchive;
+            this.projectDirectory = projectDirectory;
+            this.project = project;
         }
 
-        private void publish(ProjectRevision revision) {
-            listener.onRevisionAvailable(revision);
+        @Override
+        public String getRevisionId() {
+            return revisionId;
+        }
+
+        @Override
+        public Path getSourceArchive() {
+            return sourceArchive;
+        }
+
+        @Override
+        public Path getProjectDirectory() {
+            return projectDirectory;
+        }
+
+        @Override
+        public TesseraProject getProject() {
+            return project;
+        }
+
+        @Override
+        public ProjectRuntimeSession openRuntime() throws TesseraProjectException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean isClosed() {
+            return closed;
+        }
+
+        @Override
+        public void close() {
+            closed = true;
         }
     }
 
@@ -166,7 +246,7 @@ public class ProjectReloadCoordinatorTest {
         private final StubRuntime rollbackRuntime = new StubRuntime("previous", false);
 
         @Override
-        public ProjectRuntime create(ProjectRevision revision) {
+        public ProjectRuntime create(ProjectRevisionHandle revision) {
             if ("candidate".equals(revision.getRevisionId())) {
                 return failedRuntime;
             }
