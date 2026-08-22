@@ -1,7 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository;
 
-import io.github.byzatic.lib.configio.domain.model.ProjectLoadResultDataObject;
-import io.github.byzatic.lib.configio.unified.model.TesseraProject;
+import io.github.byzatic.tessera.lib.configio.unified.model.TesseraProject;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
@@ -13,35 +12,16 @@ import io.github.byzatic.tessera.engine.domain.repository.ProjectRepository;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.common.NodeToGNRContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.GlobalContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.NodeContainer;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.SharedResourcesContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.mapper.ProjectConfigurationMapper;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.mapper.ProjectRepositoryStateDataObject;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public final class ProjectRepositoryImpl implements ProjectRepository {
     private final ProjectConfigurationMapper projectConfigurationMapper;
 
-    private SharedResourcesContainer sharedResourcesContainer;
     private NodeContainer nodeContainer;
     private GlobalContainer globalContainer;
-
-    /**
-     * Creates repository state from a revision loaded by config-io.
-     *
-     * <p>The caller retains ownership of {@code loadedProject} and must keep it open while
-     * this repository is in use.</p>
-     *
-     * @param loadedProject loaded immutable project revision
-     */
-    public ProjectRepositoryImpl(ProjectLoadResultDataObject loadedProject) {
-        if (loadedProject == null) {
-            throw new IllegalArgumentException("loadedProject must not be null");
-        }
-        this.projectConfigurationMapper = new ProjectConfigurationMapper();
-        applyState(loadedProject);
-    }
 
     /**
      * Creates repository state from the detached unified project model.
@@ -108,21 +88,8 @@ public final class ProjectRepositoryImpl implements ProjectRepository {
         return isExists;
     }
 
-    @Override
-    public @Nullable ClassLoader getSharedResourcesClassLoader() {
-        return sharedResourcesContainer.getSharedResourcesClassLoader();
-    }
-
-    private void applyState(ProjectLoadResultDataObject source) {
-        ProjectRepositoryStateDataObject state = projectConfigurationMapper.map(source);
-        sharedResourcesContainer = state.getSharedResourcesContainer();
-        nodeContainer = state.getNodeContainer();
-        globalContainer = state.getGlobalContainer();
-    }
-
     private void applyState(TesseraProject source) {
         ProjectRepositoryStateDataObject state = projectConfigurationMapper.map(source);
-        sharedResourcesContainer = state.getSharedResourcesContainer();
         nodeContainer = state.getNodeContainer();
         globalContainer = state.getGlobalContainer();
     }

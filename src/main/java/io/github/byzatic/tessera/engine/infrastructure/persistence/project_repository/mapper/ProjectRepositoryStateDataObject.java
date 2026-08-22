@@ -2,22 +2,18 @@ package io.github.byzatic.tessera.engine.infrastructure.persistence.project_repo
 
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.GlobalContainer;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.NodeContainer;
-import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.dto.SharedResourcesContainer;
 
 public final class ProjectRepositoryStateDataObject {
 
     private final GlobalContainer globalContainer;
     private final NodeContainer nodeContainer;
-    private final SharedResourcesContainer sharedResourcesContainer;
 
     public ProjectRepositoryStateDataObject(
             GlobalContainer globalContainer,
-            NodeContainer nodeContainer,
-            SharedResourcesContainer sharedResourcesContainer
+            NodeContainer nodeContainer
     ) {
         this.globalContainer = globalContainer;
         this.nodeContainer = nodeContainer;
-        this.sharedResourcesContainer = sharedResourcesContainer;
     }
 
     public GlobalContainer getGlobalContainer() {
@@ -26,9 +22,5 @@ public final class ProjectRepositoryStateDataObject {
 
     public NodeContainer getNodeContainer() {
         return nodeContainer;
-    }
-
-    public SharedResourcesContainer getSharedResourcesContainer() {
-        return sharedResourcesContainer;
     }
 }

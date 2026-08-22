@@ -1,6 +1,6 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
-import io.github.byzatic.lib.configio.unified.ProjectRevisionHandle;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionHandle;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 
 /**

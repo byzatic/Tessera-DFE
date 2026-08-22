@@ -1,12 +1,12 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
-import io.github.byzatic.lib.configio.unified.ProjectRevisionError;
-import io.github.byzatic.lib.configio.unified.ProjectRevisionHandle;
-import io.github.byzatic.lib.configio.unified.ProjectRevisionListener;
-import io.github.byzatic.lib.configio.unified.ProjectRevisionSubscription;
-import io.github.byzatic.lib.configio.unified.ProjectRevisionWatchRequest;
-import io.github.byzatic.lib.configio.unified.TesseraProjectException;
-import io.github.byzatic.lib.configio.unified.TesseraProjectIO;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionError;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionHandle;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionListener;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionSubscription;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionWatchRequest;
+import io.github.byzatic.tessera.lib.configio.unified.TesseraProjectException;
+import io.github.byzatic.tessera.lib.configio.unified.TesseraProjectIO;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

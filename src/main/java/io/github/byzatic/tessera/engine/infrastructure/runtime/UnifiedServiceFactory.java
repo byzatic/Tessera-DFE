@@ -1,8 +1,8 @@
 package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
-import io.github.byzatic.lib.configio.unified.ProjectRuntimeSession;
-import io.github.byzatic.lib.configio.unified.ServiceCreationRequest;
-import io.github.byzatic.lib.configio.unified.TesseraProjectException;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRuntimeSession;
+import io.github.byzatic.tessera.lib.configio.unified.ServiceCreationRequest;
+import io.github.byzatic.tessera.lib.configio.unified.TesseraProjectException;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.service.api_engine.MCg3ServiceApiInterface;
 import io.github.byzatic.tessera.service.service.ServiceInterface;
