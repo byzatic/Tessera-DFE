@@ -7,8 +7,6 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [%X{identificationMessage}] - %msg%n</pattern>
-<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [%X{jpa_like_node_repository}::%X{stageId}:%X{stage}|%X{routine}:%X{routineId}] - %msg%n</pattern>-->
-<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [nodeId=%X{nodeId} jpa_like_node_repository=%X{jpa_like_node_repository} stageId=%X{stageId} stage=%X{stage} routine=%X{routine} routineId=%X{routineId}] - %msg%n</pattern>-->
         </encoder>
     </appender>
 
@@ -24,7 +22,6 @@
         </rollingPolicy>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-3relative [%thread] %-5level %logger{36} [%X{identificationMessage}] - %msg%n</pattern>
-<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss} - %msg%n</pattern>-->
         </encoder>
     </appender>
 
@@ -33,7 +30,7 @@
         <appender-ref ref="FILE-AUDIT"/>
     </logger>
 
-    <root level="warning">
+    <root level="error">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE-AUDIT"/>
     </root>
