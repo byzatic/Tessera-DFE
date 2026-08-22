@@ -12,6 +12,7 @@ PUBLISH_NODE_PIPELINE_EXECUTION_TIME="${PUBLISH_NODE_PIPELINE_EXECUTION_TIME-}"
 PUBLISH_STORAGE_ANALYTICS="${PUBLISH_STORAGE_ANALYTICS-}"
 PROJECT_NAME="${PROJECT_NAME-}"
 CONFIG_PATH="${CONFIG_PATH-}"
+LOGBACK_CONFIG_PATH="${LOGBACK_CONFIG_PATH-}"
 DATA_DIRECTORY="${DATA_DIRECTORY-}"
 PROJECT_WATCH_INTERVAL_SECONDS="${PROJECT_WATCH_INTERVAL_SECONDS-}"
 PROJECT_STARTUP_TIMEOUT_SECONDS="${PROJECT_STARTUP_TIMEOUT_SECONDS-}"
@@ -33,7 +34,21 @@ add_sysprop_if_set() {
   fi
 }
 
+add_logback_configuration_if_present() {
+  if [[ -z "${LOGBACK_CONFIG_PATH}" ]]; then
+    return
+  fi
+
+  if [[ ! -f "${LOGBACK_CONFIG_PATH}" ]]; then
+    echo "[WARN] Logback configuration not found at ${LOGBACK_CONFIG_PATH}; using classpath logback.xml" >&2
+    return
+  fi
+
+  JAVA_OPTS+=("-Dlogback.configurationFile=${LOGBACK_CONFIG_PATH}")
+}
+
 build_java_opts() {
+  add_logback_configuration_if_present
   add_sysprop_if_set "configFilePath" "${CONFIG_PATH}"
   add_sysprop_if_set "dataDirectory" "${DATA_DIRECTORY}"
   add_sysprop_if_set "projectName" "${PROJECT_NAME}"

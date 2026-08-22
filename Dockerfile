@@ -48,8 +48,12 @@ COPY --from=build /app/target/tessera-dfe-*-jar-with-dependencies.jar /app/app.j
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
 ## Set the environment variables
-ENV CONFIG_PATH="/app/configurations/configuration.xml"
 ENV DATA_DIRECTORY="/app/data"
+ENV CONFIG_PATH="/app/configurations/configuration.xml"
+ENV LOGBACK_CONFIG_PATH="/app/configurations/logback.xml"
+ENV PROJECT_WATCH_INTERVAL_SECONDS="1"
+ENV PROJECT_STARTUP_TIMEOUT_SECONDS="60"
+ENV PROJECT_SHUTDOWN_TIMEOUT_SECONDS="180"
 
 ## Run the application
 ENTRYPOINT ["/bin/bash", "/app/docker-entrypoint.sh"]

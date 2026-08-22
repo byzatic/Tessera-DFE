@@ -1,11 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
-import io.github.byzatic.lib.configio.application.module.ModuleLoaderInterface;
-import io.github.byzatic.lib.configio.application.revision.ProjectRevision;
-import io.github.byzatic.lib.configio.application.service.ServiceLoaderInterface;
-import io.github.byzatic.lib.configio.domain.exception.PluginLoadingException;
-import io.github.byzatic.lib.configio.infrastructure.factory.ModuleLoaderFactory;
-import io.github.byzatic.lib.configio.infrastructure.factory.ServiceLoaderFactory;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionHandle;
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRuntimeSession;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntime;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFactory;
@@ -38,24 +34,21 @@ import java.util.Objects;
 public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory {
 
     @Override
-    public ProjectRuntime create(ProjectRevision revision)
+    public ProjectRuntime create(ProjectRevisionHandle revision)
             throws OperationIncompleteException {
         Objects.requireNonNull(revision, "revision");
 
-        ModuleLoaderInterface moduleLoader = null;
-        ServiceLoaderInterface serviceLoader = null;
         try {
             Path projectDirectory = revision.getProjectDirectory();
-            ProjectRepository repository = createProjectRepository(revision);
-            ClassLoader sharedResourcesClassLoader = repository.getSharedResourcesClassLoader();
-
-            serviceLoader = createServiceLoader(projectDirectory, sharedResourcesClassLoader);
-            moduleLoader = createModuleLoader(projectDirectory, sharedResourcesClassLoader);
+            ProjectRuntimeSession runtimeSession = revision.openRuntime();
+            ProjectRepository repository = createProjectRepository(runtimeSession);
+            UnifiedRoutineFactory routineFactory = createRoutineFactory(runtimeSession);
+            UnifiedServiceFactory serviceFactory = createServiceFactory(runtimeSession);
 
             StorageManagerInterface storageManager = createStorageManager(repository);
             PipelineManagerFactoryInterface pipelineManagerFactory = createPipelineManagerFactory(
                     repository,
-                    moduleLoader,
+                    routineFactory,
                     storageManager,
                     projectDirectory
             );
@@ -66,7 +59,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
             );
             ServicesManagerFactory servicesManagerFactory = createServicesManagerFactory(
                     repository,
-                    serviceLoader,
+                    serviceFactory,
                     storageManager
             );
             OrchestrationService orchestrationService = createOrchestrationService(
@@ -77,12 +70,9 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
             return createProjectRuntime(
                     revision.getRevisionId(),
                     orchestrationService,
-                    storageManager,
-                    moduleLoader,
-                    serviceLoader
+                    storageManager
             );
         } catch (Exception exception) {
-            closeAfterFailure(moduleLoader, serviceLoader, exception);
             throw new OperationIncompleteException(
                     "Cannot create runtime for revision " + revision.getRevisionId(),
                     exception
@@ -93,47 +83,37 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
     /**
      * Creates the repository backed by the project data already loaded for the revision.
      *
-     * @param revision prepared project revision
+     * @param runtimeSession prepared project runtime session
      * @return repository for the revision
      * @throws OperationIncompleteException when the loaded project cannot be mapped
      */
-    private ProjectRepository createProjectRepository(ProjectRevision revision)
+    private ProjectRepository createProjectRepository(ProjectRuntimeSession runtimeSession)
             throws OperationIncompleteException {
-        return new ProjectRepositoryImpl(revision.getProject());
+        return new ProjectRepositoryImpl(runtimeSession.getProject());
     }
 
     /**
-     * Creates the service loader for the staged project directory.
+     * Creates the unified workflow-routine factory for this revision.
      *
-     * @param projectDirectory project root directory
-     * @param sharedResourcesClassLoader class loader containing project shared resources
-     * @return service loader owned by the project runtime
-     * @throws PluginLoadingException when service discovery cannot be initialized
+     * @param runtimeSession project-scoped runtime resources
+     * @return workflow-routine factory backed by the unified runtime
      */
-    private ServiceLoaderInterface createServiceLoader(
-            Path projectDirectory,
-            ClassLoader sharedResourcesClassLoader
-    ) throws PluginLoadingException {
-        Path servicesDirectory = projectDirectory.resolve("modules").resolve("services");
-        return ServiceLoaderFactory.create(servicesDirectory, sharedResourcesClassLoader);
+    private UnifiedRoutineFactory createRoutineFactory(
+            ProjectRuntimeSession runtimeSession
+    ) {
+        return new UnifiedRoutineFactory(runtimeSession);
     }
 
     /**
-     * Creates the workflow routine loader for the staged project directory.
+     * Creates the unified service factory for this revision.
      *
-     * @param projectDirectory project root directory
-     * @param sharedResourcesClassLoader class loader containing project shared resources
-     * @return module loader owned by the project runtime
-     * @throws PluginLoadingException when module discovery cannot be initialized
+     * @param runtimeSession project-scoped runtime resources
+     * @return service factory backed by the unified runtime
      */
-    private ModuleLoaderInterface createModuleLoader(
-            Path projectDirectory,
-            ClassLoader sharedResourcesClassLoader
-    ) throws PluginLoadingException {
-        Path modulesDirectory = projectDirectory
-                .resolve("modules")
-                .resolve("workflow_routines");
-        return ModuleLoaderFactory.create(modulesDirectory, sharedResourcesClassLoader);
+    private UnifiedServiceFactory createServiceFactory(
+            ProjectRuntimeSession runtimeSession
+    ) {
+        return new UnifiedServiceFactory(runtimeSession);
     }
 
     /**
@@ -152,7 +132,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
      * Creates the pipeline construction graph used by graph execution.
      *
      * @param repository project repository
-     * @param moduleLoader workflow routine loader
+     * @param routineFactory workflow-routine factory for the revision
      * @param storageManager project storage manager
      * @param projectDirectory staged project root directory
      * @return pipeline manager factory for the revision
@@ -160,7 +140,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
      */
     private PipelineManagerFactoryInterface createPipelineManagerFactory(
             ProjectRepository repository,
-            ModuleLoaderInterface moduleLoader,
+            UnifiedRoutineFactory routineFactory,
             StorageManagerInterface storageManager,
             Path projectDirectory
     ) throws OperationIncompleteException {
@@ -172,7 +152,7 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
                 new ExecutionContextFactory(repository, graphPathManager);
         return new PipelineManagerFactory(
                 repository,
-                moduleLoader,
+                routineFactory,
                 storageManager,
                 pathManager,
                 executionContextFactory
@@ -202,16 +182,16 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
      * Creates the factory responsible for project service instances.
      *
      * @param repository project repository
-     * @param serviceLoader project service loader
+     * @param serviceFactory service factory for the revision
      * @param storageManager project storage manager
      * @return service manager factory for the revision
      */
     private ServicesManagerFactory createServicesManagerFactory(
             ProjectRepository repository,
-            ServiceLoaderInterface serviceLoader,
+            UnifiedServiceFactory serviceFactory,
             StorageManagerInterface storageManager
     ) {
-        return new ServicesManagerFactory(repository, serviceLoader, storageManager);
+        return new ServicesManagerFactory(repository, serviceFactory, storageManager);
     }
 
     /**
@@ -229,56 +209,23 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
     }
 
     /**
-     * Creates the lifecycle owner for all resources belonging to one project revision.
+     * Creates the lifecycle owner for execution resources belonging to one project revision.
      *
      * @param revisionId immutable revision identifier
      * @param orchestrationService project orchestration service
      * @param storageManager project storage manager
-     * @param moduleLoader project module loader
-     * @param serviceLoader project service loader
      * @return isolated project runtime
      */
     private ProjectRuntime createProjectRuntime(
             String revisionId,
             OrchestrationService orchestrationService,
-            StorageManagerInterface storageManager,
-            ModuleLoaderInterface moduleLoader,
-            ServiceLoaderInterface serviceLoader
+            StorageManagerInterface storageManager
     ) {
         return new DefaultProjectRuntime(
                 revisionId,
                 orchestrationService,
-                storageManager,
-                moduleLoader,
-                serviceLoader
+                storageManager
         );
     }
 
-    /**
-     * Closes loaders created before a runtime construction failure.
-     *
-     * @param moduleLoader module loader, or {@code null} when it was not created
-     * @param serviceLoader service loader, or {@code null} when it was not created
-     * @param failure construction failure receiving suppressed cleanup errors
-     */
-    private void closeAfterFailure(
-            ModuleLoaderInterface moduleLoader,
-            ServiceLoaderInterface serviceLoader,
-            Throwable failure
-    ) {
-        if (moduleLoader != null) {
-            try {
-                moduleLoader.close();
-            } catch (Exception exception) {
-                failure.addSuppressed(exception);
-            }
-        }
-        if (serviceLoader != null) {
-            try {
-                serviceLoader.close();
-            } catch (Exception exception) {
-                failure.addSuppressed(exception);
-            }
-        }
-    }
 }

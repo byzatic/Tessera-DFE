@@ -62,8 +62,7 @@ public class MdcServiceContext implements MdcContextInterface {
      */
     @Override
     public AutoCloseable use() {
-        apply();
-        return this::clear;
+        return MdcContextScope.open(this);
     }
 
     @Override

@@ -49,5 +49,5 @@ flight_recording/*
 data/configProject/*
 # Игнорировать всё в configurations
 configurations/*
-# Не игнорировать example.configuration.xml в configurations
-!configurations/example.configuration.xml
+# Не игнорировать example.* в configurations
+!configurations/example.*

@@ -14,12 +14,8 @@ services:
       - PROJECT_NAME=MyAwesomeProject
       - GRAPH_CALCULATION_CRON_CYCLE=*/30 * * * * *
       - PROMETHEUS_URI=http://0.0.0.0:9090/metrics
-      - JVM_METRICS_ENABLED=True
       - XMS=512m
       - XMX=6144m
-      - PROJECT_WATCH_INTERVAL_SECONDS=1
-      - PROJECT_STARTUP_TIMEOUT_SECONDS=60
-      - PROJECT_SHUTDOWN_TIMEOUT_SECONDS=180
     logging:
       driver: json-file
       options:
