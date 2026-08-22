@@ -14,7 +14,7 @@
     <license>
       <name>The Apache-2.0 License</name>
       <url>https://www.apache.org/licenses/LICENSE-2.0</url>
-      <distribution>repo</distribution>
+      <distribution>manual</distribution>
     </license>
   </licenses>
 
