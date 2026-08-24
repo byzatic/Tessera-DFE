@@ -11,10 +11,14 @@ import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.gra
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerInterface;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.net.URI;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
@@ -30,6 +34,12 @@ import static org.mockito.Mockito.when;
 
 public class GraphManagerFactoryTest {
 
+    private static final String TEST_CONFIGURATION =
+            "<Configuration><projectName>graph-manager-test</projectName></Configuration>";
+
+    @ClassRule
+    public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
+
     private static String originalConfigurationFilePath;
     private static String originalDataDirectory;
 
@@ -37,11 +47,11 @@ public class GraphManagerFactoryTest {
     public static void startMetricsAgent() throws Exception {
         originalConfigurationFilePath = System.getProperty("configFilePath");
         originalDataDirectory = System.getProperty("dataDirectory");
-        System.setProperty(
-                "configFilePath",
-                Paths.get("configurations", "example.configuration.xml").toAbsolutePath().toString()
-        );
-        System.setProperty("dataDirectory", System.getProperty("java.io.tmpdir"));
+        Path configurationFile = TEMPORARY_FOLDER.newFile("configuration.xml").toPath();
+        Path dataDirectory = TEMPORARY_FOLDER.newFolder("data").toPath();
+        Files.writeString(configurationFile, TEST_CONFIGURATION, StandardCharsets.UTF_8);
+        System.setProperty("configFilePath", configurationFile.toString());
+        System.setProperty("dataDirectory", dataDirectory.toString());
         PrometheusMetricsAgent.getInstance().start(new URI("http://127.0.0.1:0"));
     }
 
