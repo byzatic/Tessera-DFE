@@ -252,8 +252,14 @@ to the previous loaded revision.
 | Environment | Java VM option | Default |
 |-------------|----------------|---------|
 | `PROJECT_WATCH_INTERVAL_SECONDS` | `-DprojectWatchIntervalSeconds=1` | `1` |
+| `PROJECT_INITIAL_REVISION_TIMEOUT_SECONDS` | `-DprojectInitialRevisionTimeoutSeconds=60` | `60` |
 | `PROJECT_STARTUP_TIMEOUT_SECONDS` | `-DprojectStartupTimeoutSeconds=60` | `60` |
 | `PROJECT_SHUTDOWN_TIMEOUT_SECONDS` | `-DprojectShutdownTimeoutSeconds=180` | `180` |
+
+`PROJECT_INITIAL_REVISION_TIMEOUT_SECONDS` limits the time from starting revision
+observation until the first project revision reaches the running state. Rejection of the
+initial revision terminates startup immediately. Rejections after a successful activation
+leave the active revision running.
 
 
 

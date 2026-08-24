@@ -71,6 +71,7 @@ public final class Configuration {
     public static volatile Path PROJECT_ARCHIVE_PATH;
     public static volatile Path PROJECT_STAGING_DIRECTORY;
     public static volatile Duration PROJECT_WATCH_INTERVAL;
+    public static volatile Duration PROJECT_INITIAL_REVISION_TIMEOUT;
     public static volatile Duration PROJECT_STARTUP_TIMEOUT;
     public static volatile Duration PROJECT_SHUTDOWN_TIMEOUT;
     public static volatile URI PROMETHEUS_URI;
@@ -342,6 +343,7 @@ public final class Configuration {
                         .resolve(APP_NAME)
                         .resolve("project-revisions"),
                 readPositiveDuration("projectWatchIntervalSeconds", "1"),
+                readPositiveDuration("projectInitialRevisionTimeoutSeconds", "60"),
                 readPositiveDuration("projectStartupTimeoutSeconds", "60"),
                 readPositiveDuration("projectShutdownTimeoutSeconds", "180"),
                 initPrometheusURI(config),
@@ -377,6 +379,7 @@ public final class Configuration {
         PROJECT_ARCHIVE_PATH = snapshot.projectArchivePath;
         PROJECT_STAGING_DIRECTORY = snapshot.projectStagingDirectory;
         PROJECT_WATCH_INTERVAL = snapshot.projectWatchInterval;
+        PROJECT_INITIAL_REVISION_TIMEOUT = snapshot.projectInitialRevisionTimeout;
         PROJECT_STARTUP_TIMEOUT = snapshot.projectStartupTimeout;
         PROJECT_SHUTDOWN_TIMEOUT = snapshot.projectShutdownTimeout;
         PROMETHEUS_URI = snapshot.prometheusUri;
@@ -394,6 +397,7 @@ public final class Configuration {
         private final Path projectArchivePath;
         private final Path projectStagingDirectory;
         private final Duration projectWatchInterval;
+        private final Duration projectInitialRevisionTimeout;
         private final Duration projectStartupTimeout;
         private final Duration projectShutdownTimeout;
         private final URI prometheusUri;
@@ -409,6 +413,7 @@ public final class Configuration {
                 Path projectArchivePath,
                 Path projectStagingDirectory,
                 Duration projectWatchInterval,
+                Duration projectInitialRevisionTimeout,
                 Duration projectStartupTimeout,
                 Duration projectShutdownTimeout,
                 URI prometheusUri,
@@ -423,6 +428,7 @@ public final class Configuration {
             this.projectArchivePath = projectArchivePath;
             this.projectStagingDirectory = projectStagingDirectory;
             this.projectWatchInterval = projectWatchInterval;
+            this.projectInitialRevisionTimeout = projectInitialRevisionTimeout;
             this.projectStartupTimeout = projectStartupTimeout;
             this.projectShutdownTimeout = projectShutdownTimeout;
             this.prometheusUri = prometheusUri;

@@ -15,9 +15,9 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,9 +38,10 @@ public final class ProjectReloadCoordinator
     private final TesseraProjectIO projectIO;
     private final ProjectRevisionWatchRequest watchRequest;
     private final ProjectRuntimeFactory runtimeFactory;
+    private final Duration initialRevisionTimeout;
     private final Duration startupTimeout;
     private final Duration shutdownTimeout;
-    private final ExecutorService reloadExecutor;
+    private final ScheduledExecutorService reloadExecutor;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean revisionDrainScheduled = new AtomicBoolean(false);
@@ -55,20 +56,32 @@ public final class ProjectReloadCoordinator
     private volatile ProjectRevisionSubscription revisionSubscription;
     private ProjectRuntime activeRuntime;
     private ProjectRevisionHandle activeRevision;
+    private boolean initialRevisionActivated;
 
     public ProjectReloadCoordinator(
             TesseraProjectIO projectIO,
             ProjectRevisionWatchRequest watchRequest,
             ProjectRuntimeFactory runtimeFactory,
+            Duration initialRevisionTimeout,
             Duration startupTimeout,
             Duration shutdownTimeout
     ) {
         this.projectIO = Objects.requireNonNull(projectIO, "projectIO");
         this.watchRequest = Objects.requireNonNull(watchRequest, "watchRequest");
         this.runtimeFactory = Objects.requireNonNull(runtimeFactory, "runtimeFactory");
+        this.initialRevisionTimeout = Objects.requireNonNull(
+                initialRevisionTimeout,
+                "initialRevisionTimeout"
+        );
         this.startupTimeout = Objects.requireNonNull(startupTimeout, "startupTimeout");
         this.shutdownTimeout = Objects.requireNonNull(shutdownTimeout, "shutdownTimeout");
-        this.reloadExecutor = Executors.newSingleThreadExecutor(new ReloadThreadFactory());
+        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
+                1,
+                new ReloadThreadFactory()
+        );
+        executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        executor.setRemoveOnCancelPolicy(true);
+        this.reloadExecutor = executor;
     }
 
     /**
@@ -82,9 +95,10 @@ public final class ProjectReloadCoordinator
         }
         ProjectRevisionSubscription subscription = projectIO.watchRevisions(watchRequest, this);
         revisionSubscription = subscription;
-        if (closed.get()) {
+        if (closed.get() || terminalFailure.get() != null) {
             subscription.close();
         }
+        scheduleInitialRevisionTimeout();
     }
 
     /**
@@ -98,7 +112,7 @@ public final class ProjectReloadCoordinator
         Throwable failure = terminalFailure.get();
         if (failure != null) {
             throw new OperationIncompleteException(
-                    "Active project runtime terminated with an error",
+                    "Project lifecycle terminated with an error",
                     failure
             );
         }
@@ -107,7 +121,7 @@ public final class ProjectReloadCoordinator
     @Override
     public void onRevisionAvailable(final ProjectRevisionHandle revision) {
         Objects.requireNonNull(revision, "revision");
-        if (closed.get()) {
+        if (closed.get() || terminalFailure.get() != null) {
             closeRevision(revision, null);
             return;
         }
@@ -131,11 +145,32 @@ public final class ProjectReloadCoordinator
 
     @Override
     public void onRevisionRejected(ProjectRevisionError failure) {
-        logger.error(
-                "Project archive revision {} was rejected",
-                failure.getRevisionId(),
-                failure.getCause()
-        );
+        Objects.requireNonNull(failure, "failure");
+        if (closed.get() || terminalFailure.get() != null) {
+            return;
+        }
+        try {
+            reloadExecutor.execute(new RevisionRejectedCommand(failure));
+        } catch (RejectedExecutionException exception) {
+            if (!closed.get()) {
+                failure.getCause().addSuppressed(exception);
+                reportTerminalFailureAfterRejectedExecution(failure.getCause());
+            }
+        }
+    }
+
+    private void scheduleInitialRevisionTimeout() {
+        try {
+            reloadExecutor.schedule(
+                    new InitialRevisionTimeoutCommand(),
+                    initialRevisionTimeout.toMillis(),
+                    TimeUnit.MILLISECONDS
+            );
+        } catch (RejectedExecutionException exception) {
+            if (!closed.get() && terminalFailure.get() == null) {
+                reportTerminalFailureAfterRejectedExecution(exception);
+            }
+        }
     }
 
     @Override
@@ -172,9 +207,12 @@ public final class ProjectReloadCoordinator
         ProjectRuntime candidate;
         try {
             candidate = createPreparedRuntime(revision);
-        } catch (OperationIncompleteException exception) {
+        } catch (OperationIncompleteException | RuntimeException exception) {
             logger.error("Cannot prepare project revision {}", revision.getRevisionId(), exception);
             closeRevision(revision, exception);
+            if (!initialRevisionActivated) {
+                terminateWithFailure(exception);
+            }
             return;
         }
 
@@ -196,7 +234,7 @@ public final class ProjectReloadCoordinator
             closeRuntime(previousRuntime);
             closeRevision(previousRevision, null);
             logger.info("Activated project revision {}", revision.getRevisionId());
-        } catch (OperationIncompleteException exception) {
+        } catch (OperationIncompleteException | RuntimeException exception) {
             logger.error(
                     "Cannot start project revision {}; rolling back to {}",
                     revision.getRevisionId(),
@@ -211,7 +249,7 @@ public final class ProjectReloadCoordinator
     }
 
     private void reportRuntimeFailure(ProjectRuntime runtime, Throwable failure) {
-        if (closed.get()) {
+        if (closed.get() || terminalFailure.get() != null) {
             return;
         }
         try {
@@ -253,18 +291,13 @@ public final class ProjectReloadCoordinator
             if (failedRuntime != activeRuntime) {
                 return;
             }
-            if (!terminalFailure.compareAndSet(null, failure)) {
-                return;
-            }
 
             logger.error(
                     "Active project runtime {} failed; terminating engine lifecycle",
                     failedRuntime.getRevisionId(),
                     failure
             );
-            closeRevisionSubscription();
-            stopAndCloseActiveRuntime();
-            terminated.countDown();
+            terminateWithFailure(failure);
         }
     }
 
@@ -273,12 +306,14 @@ public final class ProjectReloadCoordinator
             runtime.start(startupTimeout);
             activeRuntime = runtime;
             activeRevision = revision;
+            initialRevisionActivated = true;
             logger.info("Activated initial project revision {}", revision.getRevisionId());
-        } catch (OperationIncompleteException exception) {
+        } catch (OperationIncompleteException | RuntimeException exception) {
             logger.error("Cannot start initial project revision {}", revision.getRevisionId(), exception);
-            runtime.stop(shutdownTimeout);
+            stopRuntimeAfterFailure(runtime, exception);
             closeRuntime(runtime);
             closeRevision(revision, exception);
+            terminateWithFailure(exception);
         }
     }
 
@@ -288,8 +323,9 @@ public final class ProjectReloadCoordinator
             Throwable reloadFailure
     ) {
         closeRuntime(stoppedRuntime);
+        ProjectRuntime rollbackRuntime = null;
         try {
-            ProjectRuntime rollbackRuntime = createPreparedRuntime(previousRevision);
+            rollbackRuntime = createPreparedRuntime(previousRevision);
             rollbackRuntime.start(startupTimeout);
             activeRuntime = rollbackRuntime;
             activeRevision = previousRevision;
@@ -301,20 +337,66 @@ public final class ProjectReloadCoordinator
                     previousRevision.getRevisionId(),
                     rollbackFailure
             );
+            if (rollbackRuntime != null) {
+                stopRuntimeAfterFailure(rollbackRuntime, rollbackFailure);
+                closeRuntime(rollbackRuntime);
+            }
             closeRevision(previousRevision, rollbackFailure);
+            terminateWithFailure(reloadFailure);
+        }
+    }
+
+    private void terminateWithFailure(Throwable failure) {
+        if (!terminalFailure.compareAndSet(null, failure)) {
+            return;
+        }
+        try {
+            try {
+                closeRevisionSubscription();
+            } catch (RuntimeException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+                logger.error("Cannot close project revision subscription", cleanupFailure);
+            }
+            stopAndCloseActiveRuntime(failure);
+            closeRevision(pendingRevision.getAndSet(null), failure);
+        } finally {
+            terminated.countDown();
+        }
+    }
+
+    private void reportTerminalFailureAfterRejectedExecution(Throwable failure) {
+        if (terminalFailure.compareAndSet(null, failure)) {
+            terminated.countDown();
         }
     }
 
     private void stopAndCloseActiveRuntime() {
+        stopAndCloseActiveRuntime(null);
+    }
+
+    private void stopAndCloseActiveRuntime(Throwable failure) {
         ProjectRuntime runtime = activeRuntime;
         ProjectRevisionHandle revision = activeRevision;
         activeRuntime = null;
         activeRevision = null;
         if (runtime != null) {
-            runtime.stop(shutdownTimeout);
+            if (failure == null) {
+                runtime.stop(shutdownTimeout);
+            } else {
+                stopRuntimeAfterFailure(runtime, failure);
+            }
             closeRuntime(runtime);
         }
-        closeRevision(revision, null);
+        closeRevision(revision, failure);
+    }
+
+    private void stopRuntimeAfterFailure(ProjectRuntime runtime, Throwable failure) {
+        try {
+            runtime.stop(shutdownTimeout);
+        } catch (RuntimeException cleanupFailure) {
+            failure.addSuppressed(cleanupFailure);
+            logger.error("Cannot stop project runtime {}", runtime.getRevisionId(), cleanupFailure);
+        }
     }
 
     private void closeRuntime(ProjectRuntime runtime) {
@@ -351,7 +433,7 @@ public final class ProjectReloadCoordinator
         public void run() {
             ProjectRevisionHandle revision;
             while ((revision = pendingRevision.getAndSet(null)) != null) {
-                if (closed.get()) {
+                if (closed.get() || terminalFailure.get() != null) {
                     closeRevision(revision, null);
                 } else {
                     activate(revision);
@@ -361,6 +443,41 @@ public final class ProjectReloadCoordinator
             if (pendingRevision.get() != null) {
                 scheduleRevisionDrain();
             }
+        }
+    }
+
+    private final class RevisionRejectedCommand implements Runnable {
+
+        private final ProjectRevisionError failure;
+
+        private RevisionRejectedCommand(ProjectRevisionError failure) {
+            this.failure = failure;
+        }
+
+        @Override
+        public void run() {
+            logger.error(
+                    "Project archive revision {} was rejected",
+                    failure.getRevisionId(),
+                    failure.getCause()
+            );
+            if (!initialRevisionActivated) {
+                terminateWithFailure(failure.getCause());
+            }
+        }
+    }
+
+    private final class InitialRevisionTimeoutCommand implements Runnable {
+        @Override
+        public void run() {
+            if (initialRevisionActivated || closed.get() || terminalFailure.get() != null) {
+                return;
+            }
+            terminateWithFailure(new OperationIncompleteException(
+                    "No project revision reached RUNNING state within "
+                            + initialRevisionTimeout.toSeconds() + " seconds: "
+                            + watchRequest.getSourceArchive()
+            ));
         }
     }
 

@@ -78,6 +78,7 @@ public final class TesseraEngineLifecycleManager implements AutoCloseable {
                 projectIO,
                 watchRequest,
                 runtimeFactory,
+                Configuration.PROJECT_INITIAL_REVISION_TIMEOUT,
                 Configuration.PROJECT_STARTUP_TIMEOUT,
                 Configuration.PROJECT_SHUTDOWN_TIMEOUT
         );
