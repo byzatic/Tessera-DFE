@@ -1,0 +1,115 @@
+package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager;
+
+import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
+import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
+import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
+import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
+import io.github.byzatic.tessera.engine.infrastructure.observability.PrometheusMetricsAgent;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository.GraphManagerNodeRepositoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerFactoryInterface;
+import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerInterface;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+import java.net.URI;
+import java.util.Collections;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+public class GraphManagerFactoryTest {
+
+    @BeforeClass
+    public static void startMetricsAgent() throws Exception {
+        PrometheusMetricsAgent.getInstance().start(new URI("http://127.0.0.1:0"));
+    }
+
+    @AfterClass
+    public static void stopMetricsAgent() {
+        PrometheusMetricsAgent.getInstance().stop();
+    }
+
+    @Test
+    public void shouldCleanupOnceWhenSelfHostedGraphIsEmpty() throws Exception {
+        StorageManagerInterface storageManager = mock(StorageManagerInterface.class);
+        GraphManagerNodeRepositoryInterface nodeRepository = mock(GraphManagerNodeRepositoryInterface.class);
+        PipelineManagerFactoryInterface pipelineManagerFactory = mock(PipelineManagerFactoryInterface.class);
+        when(nodeRepository.getRootNodes()).thenReturn(Collections.emptyList());
+        GraphManagerInterface graphManager = new GraphManagerFactory(
+                storageManager,
+                nodeRepository,
+                pipelineManagerFactory
+        ).create();
+
+        graphManager.runGraph();
+
+        verify(storageManager, times(1)).cleanupNodeStorages();
+        verify(nodeRepository, times(1)).clearNodeStatuses();
+    }
+
+    @Test
+    public void shouldRunAndCleanupOnceWhenSelfHostedGraphIsNotEmpty() throws Exception {
+        StorageManagerInterface storageManager = mock(StorageManagerInterface.class);
+        GraphManagerNodeRepositoryInterface nodeRepository = mock(GraphManagerNodeRepositoryInterface.class);
+        PipelineManagerFactoryInterface pipelineManagerFactory = mock(PipelineManagerFactoryInterface.class);
+        PipelineManagerInterface pipelineManager = mock(PipelineManagerInterface.class);
+        GraphNodeRef rootRef = GraphNodeRef.newBuilder().nodeUUID("root").build();
+        Node root = Node.newBuilder()
+                .setGraphNodeRef(rootRef)
+                .setDownstream(Collections.emptyList())
+                .build();
+        when(nodeRepository.getRootNodes()).thenReturn(Collections.singletonList(rootRef));
+        when(nodeRepository.getNode(rootRef)).thenReturn(root);
+        when(nodeRepository.getNodeDownstream(root)).thenReturn(Collections.emptyList());
+        when(pipelineManagerFactory.getNewPipelineManager(eq(rootRef), anyList()))
+                .thenReturn(pipelineManager);
+        GraphManagerInterface graphManager = new GraphManagerFactory(
+                storageManager,
+                nodeRepository,
+                pipelineManagerFactory
+        ).create();
+
+        graphManager.runGraph();
+
+        verify(pipelineManager, times(1)).runPipeline();
+        verify(storageManager, times(1)).cleanupNodeStorages();
+        verify(nodeRepository, times(1)).clearNodeStatuses();
+    }
+
+    @Test
+    public void shouldPreserveExecutionFailureWhenCleanupAlsoFails() throws Exception {
+        StorageManagerInterface storageManager = mock(StorageManagerInterface.class);
+        GraphManagerNodeRepositoryInterface nodeRepository = mock(GraphManagerNodeRepositoryInterface.class);
+        PipelineManagerFactoryInterface pipelineManagerFactory = mock(PipelineManagerFactoryInterface.class);
+        OperationIncompleteException executionFailure = new OperationIncompleteException("execution failed");
+        OperationIncompleteException cleanupFailure = new OperationIncompleteException("cleanup failed");
+        when(nodeRepository.getRootNodes()).thenThrow(executionFailure);
+        doThrow(cleanupFailure).when(storageManager).cleanupNodeStorages();
+        GraphManagerInterface graphManager = new GraphManagerFactory(
+                storageManager,
+                nodeRepository,
+                pipelineManagerFactory
+        ).create();
+
+        try {
+            graphManager.runGraph();
+            fail("OperationIncompleteException expected");
+        } catch (OperationIncompleteException actual) {
+            assertSame(executionFailure, actual);
+            assertEquals(1, actual.getSuppressed().length);
+            assertSame(cleanupFailure, actual.getSuppressed()[0]);
+        }
+
+        verify(storageManager, times(1)).cleanupNodeStorages();
+    }
+}
