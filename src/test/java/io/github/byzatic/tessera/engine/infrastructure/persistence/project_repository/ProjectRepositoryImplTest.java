@@ -6,6 +6,7 @@ import io.github.byzatic.tessera.lib.configio.unified.model.Pipeline;
 import io.github.byzatic.tessera.lib.configio.unified.model.PipelineStage;
 import io.github.byzatic.tessera.lib.configio.unified.model.ProjectConfiguration;
 import io.github.byzatic.tessera.lib.configio.unified.model.ProjectNode;
+import io.github.byzatic.tessera.lib.configio.unified.model.ServiceDefinition;
 import io.github.byzatic.tessera.lib.configio.unified.model.TesseraProject;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import org.junit.Test;
@@ -15,6 +16,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 
 public class ProjectRepositoryImplTest {
 
@@ -57,5 +59,32 @@ public class ProjectRepositoryImplTest {
         assertNotNull(repository.getNode(nodeReference));
         assertEquals(1, repository.getPipeline(nodeReference)
                 .getStagesConsistency().size());
+    }
+
+    @Test
+    public void shouldRejectDuplicateServiceIds() {
+        ServiceDefinition first = ServiceDefinition.newBuilder()
+                .id("duplicate")
+                .description("first")
+                .build();
+        ServiceDefinition second = ServiceDefinition.newBuilder()
+                .id("duplicate")
+                .description("second")
+                .build();
+        TesseraProject project = TesseraProject.newBuilder()
+                .formatVersion("v1")
+                .name("duplicate-services")
+                .configuration(ProjectConfiguration.newBuilder()
+                        .services(List.of(first, second))
+                        .build())
+                .nodes(Map.of())
+                .build();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> new ProjectRepositoryImpl(project)
+        );
+
+        assertEquals("Duplicate service id: duplicate", exception.getMessage());
     }
 }
