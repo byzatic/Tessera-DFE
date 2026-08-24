@@ -14,6 +14,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
@@ -29,14 +30,34 @@ import static org.mockito.Mockito.when;
 
 public class GraphManagerFactoryTest {
 
+    private static String originalConfigurationFilePath;
+    private static String originalDataDirectory;
+
     @BeforeClass
     public static void startMetricsAgent() throws Exception {
+        originalConfigurationFilePath = System.getProperty("configFilePath");
+        originalDataDirectory = System.getProperty("dataDirectory");
+        System.setProperty(
+                "configFilePath",
+                Paths.get("configurations", "example.configuration.xml").toAbsolutePath().toString()
+        );
+        System.setProperty("dataDirectory", System.getProperty("java.io.tmpdir"));
         PrometheusMetricsAgent.getInstance().start(new URI("http://127.0.0.1:0"));
     }
 
     @AfterClass
     public static void stopMetricsAgent() {
         PrometheusMetricsAgent.getInstance().stop();
+        if (originalConfigurationFilePath == null) {
+            System.clearProperty("configFilePath");
+        } else {
+            System.setProperty("configFilePath", originalConfigurationFilePath);
+        }
+        if (originalDataDirectory == null) {
+            System.clearProperty("dataDirectory");
+        } else {
+            System.setProperty("dataDirectory", originalDataDirectory);
+        }
     }
 
     @Test
