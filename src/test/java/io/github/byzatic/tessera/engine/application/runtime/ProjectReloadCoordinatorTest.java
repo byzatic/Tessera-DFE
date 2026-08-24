@@ -104,6 +104,45 @@ public class ProjectReloadCoordinatorTest {
         }
     }
 
+    @Test
+    public void terminatesWhenRollbackRuntimeReportsFatalFailure() throws Exception {
+        StubProjectIO projectIO = new StubProjectIO();
+        StubRuntimeFactory factory = new StubRuntimeFactory();
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                projectIO,
+                createWatchRequest(),
+                factory,
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+        ProjectRevisionHandle previous = createRevision("previous");
+        ProjectRevisionHandle candidate = createRevision("candidate");
+        RuntimeException expectedFailure = new RuntimeException("Expected rollback runtime failure");
+
+        try {
+            coordinator.start();
+            projectIO.publish(previous);
+            assertTrue(factory.initialRuntime.awaitStarted());
+
+            projectIO.publish(candidate);
+            assertTrue(factory.rollbackRuntime.awaitStarted());
+            assertTrue(factory.rollbackRuntime.wasFailureListenerRegisteredAtStart());
+
+            factory.rollbackRuntime.fail(expectedFailure);
+
+            try {
+                coordinator.awaitTermination();
+                fail("Coordinator must propagate the rollback runtime failure");
+            } catch (OperationIncompleteException exception) {
+                assertSame(expectedFailure, exception.getCause());
+            }
+            assertTrue(factory.rollbackRuntime.getStopCount() == 1);
+            assertTrue(previous.isClosed());
+        } finally {
+            coordinator.close();
+        }
+    }
+
     private ProjectRevisionWatchRequest createWatchRequest() throws IOException {
         Path sourceArchive = temporaryFolder.newFile("source.zip").toPath();
         Path stagingDirectory = temporaryFolder.newFolder("staging").toPath();
@@ -264,6 +303,7 @@ public class ProjectReloadCoordinatorTest {
         private final CountDownLatch started = new CountDownLatch(1);
         private final AtomicInteger stopCount = new AtomicInteger();
         private ProjectRuntimeFailureListener failureListener;
+        private boolean failureListenerRegisteredAtStart;
 
         private StubRuntime(String revisionId, boolean failOnStart) {
             this.revisionId = revisionId;
@@ -277,6 +317,7 @@ public class ProjectReloadCoordinatorTest {
 
         @Override
         public void start(Duration startupTimeout) throws OperationIncompleteException {
+            failureListenerRegisteredAtStart = failureListener != null;
             if (failOnStart) {
                 throw new OperationIncompleteException("Expected startup failure");
             }
@@ -303,6 +344,10 @@ public class ProjectReloadCoordinatorTest {
 
         private int getStopCount() {
             return stopCount.get();
+        }
+
+        private boolean wasFailureListenerRegisteredAtStart() {
+            return failureListenerRegisteredAtStart;
         }
 
         private void fail(Throwable failure) {

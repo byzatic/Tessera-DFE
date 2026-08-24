@@ -49,6 +49,8 @@ public final class ProjectReloadCoordinator
     private final AtomicReference<Throwable> terminalFailure =
             new AtomicReference<Throwable>();
     private final CountDownLatch terminated = new CountDownLatch(1);
+    private final ProjectRuntimeFailureListener runtimeFailureListener =
+            new RuntimeFailureListener();
 
     private volatile ProjectRevisionSubscription revisionSubscription;
     private ProjectRuntime activeRuntime;
@@ -169,8 +171,7 @@ public final class ProjectReloadCoordinator
 
         ProjectRuntime candidate;
         try {
-            candidate = runtimeFactory.create(revision);
-            candidate.setFailureListener(new RuntimeFailureListener());
+            candidate = createPreparedRuntime(revision);
         } catch (OperationIncompleteException exception) {
             logger.error("Cannot prepare project revision {}", revision.getRevisionId(), exception);
             closeRevision(revision, exception);
@@ -230,6 +231,13 @@ public final class ProjectReloadCoordinator
         }
     }
 
+    private ProjectRuntime createPreparedRuntime(ProjectRevisionHandle revision)
+            throws OperationIncompleteException {
+        ProjectRuntime runtime = runtimeFactory.create(revision);
+        runtime.setFailureListener(runtimeFailureListener);
+        return runtime;
+    }
+
     private final class RuntimeFailureCommand implements Runnable {
 
         private final ProjectRuntime failedRuntime;
@@ -281,7 +289,7 @@ public final class ProjectReloadCoordinator
     ) {
         closeRuntime(stoppedRuntime);
         try {
-            ProjectRuntime rollbackRuntime = runtimeFactory.create(previousRevision);
+            ProjectRuntime rollbackRuntime = createPreparedRuntime(previousRevision);
             rollbackRuntime.start(startupTimeout);
             activeRuntime = rollbackRuntime;
             activeRevision = previousRevision;
