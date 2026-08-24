@@ -1,6 +1,7 @@
 package io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository;
 
 import io.github.byzatic.tessera.lib.configio.unified.model.TesseraProject;
+import io.github.byzatic.tessera.lib.configio.unified.model.ServiceDefinition;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
@@ -15,7 +16,10 @@ import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repos
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.mapper.ProjectConfigurationMapper;
 import io.github.byzatic.tessera.engine.infrastructure.persistence.project_repository.mapper.ProjectRepositoryStateDataObject;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class ProjectRepositoryImpl implements ProjectRepository {
     private final ProjectConfigurationMapper projectConfigurationMapper;
@@ -35,8 +39,18 @@ public final class ProjectRepositoryImpl implements ProjectRepository {
         if (project == null) {
             throw new IllegalArgumentException("project must not be null");
         }
+        validateUniqueServiceIds(project);
         this.projectConfigurationMapper = new ProjectConfigurationMapper();
         applyState(project);
+    }
+
+    private static void validateUniqueServiceIds(TesseraProject project) {
+        Set<String> serviceIds = new HashSet<String>();
+        for (ServiceDefinition service : project.getConfiguration().getServices()) {
+            if (!serviceIds.add(service.getId())) {
+                throw new IllegalArgumentException("Duplicate service id: " + service.getId());
+            }
+        }
     }
 
     @Override

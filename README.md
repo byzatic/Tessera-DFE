@@ -1,10 +1,15 @@
 ![Build](https://github.com/byzatic/Tessera-DFE/actions/workflows/main.yml/badge.svg)
+
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Java](https://img.shields.io/badge/Java-17-orange)
+![Version](https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fbyzatic%2FTessera-DFE%2Fmain%2Fpom.xml&query=%2F%2A%5Blocal-name%28%29%3D%27project%27%5D%2F%2A%5Blocal-name%28%29%3D%27version%27%5D&label=version) \
+[![Open Issues](https://img.shields.io/github/issues/byzatic/Tessera-DFE)](https://github.com/byzatic/Tessera-DFE/issues)
+[![Open Pull Requests](https://img.shields.io/github/issues-pr/byzatic/Tessera-DFE)](https://github.com/byzatic/Tessera-DFE/pulls)
+
+![Docker Last Updated](https://img.shields.io/docker/last-updated/byzatic/tessera-data-flow-engine)
+![Docker Image Size](https://img.shields.io/docker/image-size/byzatic/tessera-data-flow-engine/latest)
 ![Docker Pulls](https://img.shields.io/docker/pulls/byzatic/tessera-data-flow-engine)
-![Docker Version](https://img.shields.io/docker/v/byzatic/tessera-data-flow-engine)
-![Prometheus](https://img.shields.io/badge/metrics-Prometheus-brightgreen)
-![Architecture](https://img.shields.io/badge/architecture-DAG-blueviolet)
+
 
 # Tessera Data Flow Engine
 Tessera Data Flow Engine is a modular execution system based on directed acyclic graphs (DAGs), designed to build flexible and extensible data processing pipelines. Each module (service/routine) represents an independent node that processes data and passes the result along the execution graph.
@@ -252,8 +257,14 @@ to the previous loaded revision.
 | Environment | Java VM option | Default |
 |-------------|----------------|---------|
 | `PROJECT_WATCH_INTERVAL_SECONDS` | `-DprojectWatchIntervalSeconds=1` | `1` |
+| `PROJECT_INITIAL_REVISION_TIMEOUT_SECONDS` | `-DprojectInitialRevisionTimeoutSeconds=60` | `60` |
 | `PROJECT_STARTUP_TIMEOUT_SECONDS` | `-DprojectStartupTimeoutSeconds=60` | `60` |
 | `PROJECT_SHUTDOWN_TIMEOUT_SECONDS` | `-DprojectShutdownTimeoutSeconds=180` | `180` |
+
+`PROJECT_INITIAL_REVISION_TIMEOUT_SECONDS` limits the time from starting revision
+observation until the first project revision reaches the running state. Rejection of the
+initial revision terminates startup immediately. Rejections after a successful activation
+leave the active revision running.
 
 
 

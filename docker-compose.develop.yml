@@ -28,6 +28,7 @@ services:
       # Develop Flight Recording
       - JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,duration=300s,delay=400s,ParallelGCThreads=2
       #- PROJECT_WATCH_INTERVAL_SECONDS=1
+      #- PROJECT_INITIAL_REVISION_TIMEOUT_SECONDS=60
       #- PROJECT_STARTUP_TIMEOUT_SECONDS=60
       #- PROJECT_SHUTDOWN_TIMEOUT_SECONDS=180
     logging:
@@ -42,7 +43,6 @@ networks:
   93849dcd429a-test-develop-tessera-dfe:
     name: 93849dcd429a-test-develop-tessera-dfe
     external: false
-
 
 
 

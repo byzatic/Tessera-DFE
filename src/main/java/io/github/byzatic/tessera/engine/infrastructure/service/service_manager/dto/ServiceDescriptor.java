@@ -7,7 +7,6 @@ import java.util.Objects;
 
 public class ServiceDescriptor {
     private String serviceName = null;
-    private String serviceJobId = null;
     private List<ServiceParameter> serviceParameterList = null;
 
     private ServiceDescriptor() {
@@ -17,8 +16,7 @@ public class ServiceDescriptor {
         ObjectsUtils.requireNonNull(builder.serviceName, new IllegalArgumentException("serviceName in " + this.getClass().getSimpleName() + " require NonNull"));
         ObjectsUtils.requireNonNull(builder.serviceParameterList, new IllegalArgumentException("serviceParameterList in " + this.getClass().getSimpleName() + " require NonNull"));
         serviceName = builder.serviceName;
-        serviceJobId = builder.serviceJobId;
-        serviceParameterList = builder.serviceParameterList;
+        serviceParameterList = List.copyOf(builder.serviceParameterList);
     }
 
     public static Builder newBuilder() {
@@ -28,17 +26,12 @@ public class ServiceDescriptor {
     public static Builder newBuilder(ServiceDescriptor copy) {
         Builder builder = new Builder();
         builder.serviceName = copy.getServiceName();
-        builder.serviceJobId = copy.getServiceJobId();
         builder.serviceParameterList = copy.getServiceParameterList();
         return builder;
     }
 
     public String getServiceName() {
         return serviceName;
-    }
-
-    public String getServiceJobId() {
-        return serviceJobId;
     }
 
     public List<ServiceParameter> getServiceParameterList() {
@@ -50,19 +43,18 @@ public class ServiceDescriptor {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ServiceDescriptor that = (ServiceDescriptor) o;
-        return Objects.equals(serviceName, that.serviceName) && Objects.equals(serviceJobId, that.serviceJobId) && Objects.equals(serviceParameterList, that.serviceParameterList);
+        return Objects.equals(serviceName, that.serviceName) && Objects.equals(serviceParameterList, that.serviceParameterList);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(serviceName, serviceJobId, serviceParameterList);
+        return Objects.hash(serviceName, serviceParameterList);
     }
 
     @Override
     public String toString() {
         return "ServiceDescriptor{" +
                 "serviceName='" + serviceName + '\'' +
-                ", serviceJobId='" + serviceJobId + '\'' +
                 ", serviceParameterList=" + serviceParameterList +
                 '}';
     }
@@ -72,7 +64,6 @@ public class ServiceDescriptor {
      */
     public static final class Builder {
         private String serviceName;
-        private String serviceJobId;
         private List<ServiceParameter> serviceParameterList;
 
         private Builder() {
@@ -86,17 +77,6 @@ public class ServiceDescriptor {
          */
         public Builder setServiceName(String serviceName) {
             this.serviceName = serviceName;
-            return this;
-        }
-
-        /**
-         * Sets the {@code serviceJobId} and returns a reference to this Builder so that the methods can be chained together.
-         *
-         * @param serviceJobId the {@code serviceJobId} to set
-         * @return a reference to this Builder
-         */
-        public Builder setServiceJobId(String serviceJobId) {
-            this.serviceJobId = serviceJobId;
             return this;
         }
 

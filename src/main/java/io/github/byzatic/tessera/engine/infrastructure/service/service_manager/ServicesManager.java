@@ -48,9 +48,9 @@ public class ServicesManager implements ServicesManagerInterface {
     private final ImmediateSchedulerInterface scheduler;
 
     /**
-     * serviceDescriptorMap keeps original descriptors (keyed by hash).
+     * Configuration descriptors keyed by their validated service identifiers.
      */
-    private final Map<Integer, ServiceDescriptor> serviceDescriptorMap = new ConcurrentHashMap<>();
+    private final Map<String, ServiceDescriptor> serviceDescriptorsById = new LinkedHashMap<>();
 
     /**
      * Map serviceName -> jobId for quick existence checks.
@@ -160,6 +160,9 @@ public class ServicesManager implements ServicesManagerInterface {
         Objects.requireNonNull(fullProjectRepository, "projectGlobalRepository");
         for (ServiceItem serviceDescription : fullProjectRepository.getGlobal().getServices()) {
             String serviceId = serviceDescription.getIdName();
+            if (serviceId == null || serviceId.isBlank()) {
+                throw new IllegalArgumentException("Service id must not be blank");
+            }
             List<ServiceParameter> serviceParameters = new ArrayList<>();
             for (ServicesOptionsItem opt : serviceDescription.getOptions()) {
                 serviceParameters.add(
@@ -171,31 +174,21 @@ public class ServicesManager implements ServicesManagerInterface {
             }
             ServiceDescriptor sd = ServiceDescriptor.newBuilder()
                     .setServiceName(serviceId)
-                    .setServiceJobId(null)
                     .setServiceParameterList(serviceParameters)
                     .build();
-            serviceDescriptorMap.put(sd.hashCode(), sd);
+            ServiceDescriptor previous = serviceDescriptorsById.putIfAbsent(serviceId, sd);
+            if (previous != null) {
+                throw new IllegalArgumentException("Duplicate service id: " + serviceId);
+            }
             logger.debug("Service with id {} registered in {}", serviceId, this.getClass().getSimpleName());
         }
-    }
-
-    private void updateServiceDescriptorWithProcessId(ServiceDescriptor sd, String newId) {
-        ServiceDescriptor newServiceDescriptor = ServiceDescriptor.newBuilder()
-                .setServiceName(sd.getServiceName())
-                .setServiceJobId(newId)
-                .setServiceParameterList(sd.getServiceParameterList())
-                .build();
-        serviceDescriptorMap.put(sd.hashCode(), newServiceDescriptor);
     }
 
     @Override
     public void runAllServices() throws OperationIncompleteException {
         logger.debug("Requested run all services");
         try {
-            Map<String, ServiceDescriptor> toUpdate = new HashMap<>();
-
-            for (Map.Entry<Integer, ServiceDescriptor> e : serviceDescriptorMap.entrySet()) {
-                ServiceDescriptor sd = e.getValue();
+            for (ServiceDescriptor sd : serviceDescriptorsById.values()) {
 
                 // Если уже запланирован/работает — пропускаем
                 UUID existing = serviceNameToJobId.get(sd.getServiceName());
@@ -243,14 +236,8 @@ public class ServicesManager implements ServicesManagerInterface {
 
                 runningServices.put(jobId, service);
                 serviceNameToJobId.put(sd.getServiceName(), jobId);
-                toUpdate.put(jobId.toString(), sd);
 
                 logger.info("Service {} scheduled as {}", sd.getServiceName(), jobId);
-            }
-
-            // Проставляем jobId в дескрипторы
-            for (Map.Entry<String, ServiceDescriptor> p : toUpdate.entrySet()) {
-                updateServiceDescriptorWithProcessId(p.getValue(), p.getKey());
             }
 
             // ImmediateScheduler сам стартует таски при addTask()

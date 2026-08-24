@@ -1,5 +1,6 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
+import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionError;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionHandle;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionListener;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionSubscription;
@@ -45,6 +46,7 @@ public class ProjectReloadCoordinatorTest {
                 createWatchRequest(),
                 factory,
                 Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L),
                 Duration.ofSeconds(2L)
         );
         ProjectRevisionHandle previous = createRevision("previous");
@@ -79,6 +81,7 @@ public class ProjectReloadCoordinatorTest {
                 createWatchRequest(),
                 factory,
                 Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L),
                 Duration.ofSeconds(2L)
         );
         ProjectRevisionHandle revision = createRevision("previous");
@@ -99,6 +102,201 @@ public class ProjectReloadCoordinatorTest {
             }
             assertTrue(factory.initialRuntime.getStopCount() == 1);
             assertTrue(revision.isClosed());
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    public void terminatesWhenRollbackRuntimeReportsFatalFailure() throws Exception {
+        StubProjectIO projectIO = new StubProjectIO();
+        StubRuntimeFactory factory = new StubRuntimeFactory();
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                projectIO,
+                createWatchRequest(),
+                factory,
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+        ProjectRevisionHandle previous = createRevision("previous");
+        ProjectRevisionHandle candidate = createRevision("candidate");
+        RuntimeException expectedFailure = new RuntimeException("Expected rollback runtime failure");
+
+        try {
+            coordinator.start();
+            projectIO.publish(previous);
+            assertTrue(factory.initialRuntime.awaitStarted());
+
+            projectIO.publish(candidate);
+            assertTrue(factory.rollbackRuntime.awaitStarted());
+            assertTrue(factory.rollbackRuntime.wasFailureListenerRegisteredAtStart());
+
+            factory.rollbackRuntime.fail(expectedFailure);
+
+            try {
+                coordinator.awaitTermination();
+                fail("Coordinator must propagate the rollback runtime failure");
+            } catch (OperationIncompleteException exception) {
+                assertSame(expectedFailure, exception.getCause());
+            }
+            assertTrue(factory.rollbackRuntime.getStopCount() == 1);
+            assertTrue(previous.isClosed());
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    public void terminatesWhenInitialRevisionIsRejected() throws Exception {
+        StubProjectIO projectIO = new StubProjectIO();
+        StubRuntimeFactory factory = new StubRuntimeFactory();
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                projectIO,
+                createWatchRequest(),
+                factory,
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+        RuntimeException expectedFailure = new RuntimeException("Invalid initial revision");
+
+        try {
+            coordinator.start();
+            projectIO.reject(expectedFailure);
+
+            try {
+                coordinator.awaitTermination();
+                fail("Coordinator must propagate rejection of the initial revision");
+            } catch (OperationIncompleteException exception) {
+                assertSame(expectedFailure, exception.getCause());
+            }
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    public void terminatesWhenInitialRevisionDoesNotAppearInTime() throws Exception {
+        StubProjectIO projectIO = new StubProjectIO();
+        StubRuntimeFactory factory = new StubRuntimeFactory();
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                projectIO,
+                createWatchRequest(),
+                factory,
+                Duration.ofMillis(50L),
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+
+        try {
+            coordinator.start();
+
+            try {
+                coordinator.awaitTermination();
+                fail("Coordinator must time out while waiting for the initial revision");
+            } catch (OperationIncompleteException exception) {
+                assertTrue(exception.getCause() instanceof OperationIncompleteException);
+                assertTrue(exception.getCause().getMessage().contains(
+                        "No project revision reached RUNNING state"
+                ));
+            }
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    public void terminatesWhenInitialRuntimeFailsToStart() throws Exception {
+        StubProjectIO projectIO = new StubProjectIO();
+        StubRuntimeFactory factory = new StubRuntimeFactory(true, false);
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                projectIO,
+                createWatchRequest(),
+                factory,
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+        ProjectRevisionHandle revision = createRevision("previous");
+
+        try {
+            coordinator.start();
+            projectIO.publish(revision);
+
+            try {
+                coordinator.awaitTermination();
+                fail("Coordinator must propagate initial runtime startup failure");
+            } catch (OperationIncompleteException exception) {
+                assertTrue(exception.getCause().getMessage().contains("Expected startup failure"));
+            }
+            assertTrue(revision.isClosed());
+            assertTrue(factory.initialRuntime.getStopCount() == 1);
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    public void terminatesWhenRollbackCannotBeStarted() throws Exception {
+        StubProjectIO projectIO = new StubProjectIO();
+        StubRuntimeFactory factory = new StubRuntimeFactory(false, true);
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                projectIO,
+                createWatchRequest(),
+                factory,
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+        ProjectRevisionHandle previous = createRevision("previous");
+        ProjectRevisionHandle candidate = createRevision("candidate");
+
+        try {
+            coordinator.start();
+            projectIO.publish(previous);
+            assertTrue(factory.initialRuntime.awaitStarted());
+            projectIO.publish(candidate);
+
+            try {
+                coordinator.awaitTermination();
+                fail("Coordinator must terminate when rollback cannot be started");
+            } catch (OperationIncompleteException exception) {
+                assertTrue(exception.getCause().getSuppressed().length == 1);
+            }
+            assertTrue(previous.isClosed());
+            assertTrue(candidate.isClosed());
+            assertTrue(factory.rollbackRuntime.getStopCount() == 1);
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    public void keepsRunningWhenLaterRevisionIsRejected() throws Exception {
+        StubProjectIO projectIO = new StubProjectIO();
+        StubRuntimeFactory factory = new StubRuntimeFactory();
+        ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
+                projectIO,
+                createWatchRequest(),
+                factory,
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L),
+                Duration.ofSeconds(2L)
+        );
+        ProjectRevisionHandle previous = createRevision("previous");
+        ProjectRevisionHandle candidate = createRevision("candidate");
+
+        try {
+            coordinator.start();
+            projectIO.publish(previous);
+            assertTrue(factory.initialRuntime.awaitStarted());
+
+            projectIO.reject(new RuntimeException("Invalid later revision"));
+            projectIO.publish(candidate);
+
+            assertTrue(factory.rollbackRuntime.awaitStarted());
+            assertFalse(previous.isClosed());
         } finally {
             coordinator.close();
         }
@@ -163,6 +361,14 @@ public class ProjectReloadCoordinatorTest {
 
         private void publish(ProjectRevisionHandle revision) {
             listener.onRevisionAvailable(revision);
+        }
+
+        private void reject(Throwable cause) {
+            listener.onRevisionRejected(ProjectRevisionError.newBuilder()
+                    .sourceArchive(Path.of("source.zip"))
+                    .revisionId("rejected")
+                    .cause(cause)
+                    .build());
         }
     }
 
@@ -241,9 +447,18 @@ public class ProjectReloadCoordinatorTest {
     private static final class StubRuntimeFactory implements ProjectRuntimeFactory {
 
         private final AtomicInteger previousCreations = new AtomicInteger();
-        private final StubRuntime initialRuntime = new StubRuntime("previous", false);
+        private final StubRuntime initialRuntime;
         private final StubRuntime failedRuntime = new StubRuntime("candidate", true);
-        private final StubRuntime rollbackRuntime = new StubRuntime("previous", false);
+        private final StubRuntime rollbackRuntime;
+
+        private StubRuntimeFactory() {
+            this(false, false);
+        }
+
+        private StubRuntimeFactory(boolean failInitialStart, boolean failRollbackStart) {
+            initialRuntime = new StubRuntime("previous", failInitialStart);
+            rollbackRuntime = new StubRuntime("previous", failRollbackStart);
+        }
 
         @Override
         public ProjectRuntime create(ProjectRevisionHandle revision) {
@@ -264,6 +479,7 @@ public class ProjectReloadCoordinatorTest {
         private final CountDownLatch started = new CountDownLatch(1);
         private final AtomicInteger stopCount = new AtomicInteger();
         private ProjectRuntimeFailureListener failureListener;
+        private boolean failureListenerRegisteredAtStart;
 
         private StubRuntime(String revisionId, boolean failOnStart) {
             this.revisionId = revisionId;
@@ -277,6 +493,7 @@ public class ProjectReloadCoordinatorTest {
 
         @Override
         public void start(Duration startupTimeout) throws OperationIncompleteException {
+            failureListenerRegisteredAtStart = failureListener != null;
             if (failOnStart) {
                 throw new OperationIncompleteException("Expected startup failure");
             }
@@ -303,6 +520,10 @@ public class ProjectReloadCoordinatorTest {
 
         private int getStopCount() {
             return stopCount.get();
+        }
+
+        private boolean wasFailureListenerRegisteredAtStart() {
+            return failureListenerRegisteredAtStart;
         }
 
         private void fail(Throwable failure) {

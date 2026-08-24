@@ -35,6 +35,7 @@ public final class GraphManagerFactory implements GraphManagerFactoryInterface {
     public GraphManagerInterface create(JobEventListener... listeners) {
         // Используем конструктор GraphManager, создающий собственный ImmediateScheduler
         return new GraphManager(
+                storageManager,
                 graphManagerNodeRepository,
                 pipelineManagerFactory,
                 listeners

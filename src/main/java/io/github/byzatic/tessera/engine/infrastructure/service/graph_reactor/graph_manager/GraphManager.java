@@ -40,7 +40,7 @@ public class GraphManager implements GraphManagerInterface {
 
     private final ImmediateSchedulerInterface scheduler;
     private final boolean ownsScheduler;
-    private StorageManagerInterface storageManager;
+    private final StorageManagerInterface storageManager;
 
     /**
      * Конструктор с внешним шедуллером (рекомендуемый для совместного использования в оркестрации).
@@ -50,6 +50,7 @@ public class GraphManager implements GraphManagerInterface {
                         @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
                         @NotNull ImmediateSchedulerInterface scheduler,
                         JobEventListener... listeners) {
+        Objects.requireNonNull(storageManager, "storageManager");
         ObjectsUtils.requireNonNull(graphManagerNodeRepository,
                 new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
         ObjectsUtils.requireNonNull(pipelineManagerFactory,
@@ -80,9 +81,11 @@ public class GraphManager implements GraphManagerInterface {
     /**
      * Конструктор, создающий собственный ImmediateScheduler.
      */
-    public GraphManager(@NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
+    public GraphManager(@NotNull StorageManagerInterface storageManager,
+                        @NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
                         @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
                         JobEventListener... listeners) {
+        Objects.requireNonNull(storageManager, "storageManager");
         ObjectsUtils.requireNonNull(graphManagerNodeRepository,
                 new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
         ObjectsUtils.requireNonNull(pipelineManagerFactory,
@@ -90,6 +93,7 @@ public class GraphManager implements GraphManagerInterface {
 
         this.graphManagerNodeRepository = graphManagerNodeRepository;
         this.pipelineManagerFactory = pipelineManagerFactory;
+        this.storageManager = storageManager;
 
         this.scheduler = new ImmediateScheduler.Builder()
                 .defaultGrace(Duration.ofSeconds(10))
@@ -108,6 +112,7 @@ public class GraphManager implements GraphManagerInterface {
 
     @Override
     public void runGraph() throws OperationIncompleteException {
+        OperationIncompleteException executionFailure = null;
         try {
             // 1) Получаем список корневых узлов (как и раньше).
             final List<GraphNodeRef> rootRefs = graphManagerNodeRepository.getRootNodes();
@@ -220,12 +225,13 @@ public class GraphManager implements GraphManagerInterface {
                     } catch (Throwable ignore) {
                     }
                 }
-                clear();
             }
         } catch (OperationIncompleteException e) {
+            executionFailure = e;
             throw e;
         } catch (Throwable t) {
-            throw new OperationIncompleteException(t);
+            executionFailure = new OperationIncompleteException(t);
+            throw executionFailure;
         } finally {
             // Если шедуллер наш — закрываем ресурсы.
             if (ownsScheduler) {
@@ -234,7 +240,20 @@ public class GraphManager implements GraphManagerInterface {
                 } catch (Exception ignored) {
                 }
             }
-            clear();
+            try {
+                clear();
+            } catch (Throwable cleanupError) {
+                OperationIncompleteException cleanupFailure = cleanupError instanceof OperationIncompleteException
+                        ? (OperationIncompleteException) cleanupError
+                        : new OperationIncompleteException(cleanupError);
+                if (executionFailure != null) {
+                    if (executionFailure != cleanupFailure) {
+                        executionFailure.addSuppressed(cleanupFailure);
+                    }
+                } else {
+                    throw cleanupFailure;
+                }
+            }
         }
     }
 
@@ -244,14 +263,10 @@ public class GraphManager implements GraphManagerInterface {
     }
 
     private void clear() throws OperationIncompleteException {
-        try {
-            this.storageManager.cleanupNodeStorages();
-            logger.debug("StorageManager cleanup complete");
-            this.graphManagerNodeRepository.clearNodeStatuses();
-            logger.debug("GraphManagerNodeRepository cleanup complete");
-        } catch (OperationIncompleteException e) {
-            throw new OperationIncompleteException(e);
-        }
+        this.storageManager.cleanupNodeStorages();
+        logger.debug("StorageManager cleanup complete");
+        this.graphManagerNodeRepository.clearNodeStatuses();
+        logger.debug("GraphManagerNodeRepository cleanup complete");
     }
 
     /**
