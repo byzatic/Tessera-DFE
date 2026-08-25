@@ -51,3 +51,5 @@ data/configProject/*
 configurations/*
 # Не игнорировать example.* в configurations
 !configurations/example.*
+# Игнорировать integration tests
+integration-tests.sh

@@ -333,6 +333,39 @@ In development mode, the system uses `docker-compose.develop.yml`. Instead of pu
 
 Development mode uses the same in-process project revision watcher as production mode. Replacing the selected ZIP archive triggers project runtime reload without rebuilding or restarting the container.
 
+#### Project reload integration tests
+
+The repository includes a Docker-based integration test runner for the project archives in
+`.develop/INPUT_EXAMPLES/test_projects`. Every numeric marker file is interpreted as the
+expected number of lines returned by `GET http://localhost:8080/metrics`; for example,
+`s10/276` expects 276 lines after installing the `s10` archive.
+
+Each case starts a fresh container with `beggin/MyAwsomeProject.zip`, waits until the API
+returns 60 lines for several consecutive requests, atomically installs the case archive,
+and then waits for the case-specific line count. HTTP requests and both phases have bounded
+timeouts, so a stopped or hung application fails the test instead of blocking the suite.
+Container logs, the last HTTP responses, inspection data, and a TSV summary are saved under
+`target/project-integration-tests/`.
+
+Run all numeric cases using an already built development image:
+
+```bash
+./integration-tests.sh
+```
+
+Build the image first or select individual cases:
+
+```bash
+./integration-tests.sh --build
+./integration-tests.sh s10 s100
+```
+
+Timeouts can be adjusted for slower machines without changing the script:
+
+```bash
+STARTUP_TIMEOUT_SECONDS=300 RELOAD_TIMEOUT_SECONDS=600 ./integration-tests.sh s100
+```
+
 To build the development image:
 
 ```bash
