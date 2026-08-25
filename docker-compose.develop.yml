@@ -1,4 +1,3 @@
-version: '3.7'
 services:
   tessera-dfe-develop:
     build:
@@ -43,5 +42,4 @@ networks:
   93849dcd429a-test-develop-tessera-dfe:
     name: 93849dcd429a-test-develop-tessera-dfe
     external: false
-
 

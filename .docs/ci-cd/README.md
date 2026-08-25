@@ -125,6 +125,12 @@ Consequently, the saved cache contains reusable release dependencies but does no
 
 This policy guarantees freshness relative to the repository contents available during a run; it does not make mutable SNAPSHOT coordinates reproducible. Production releases should prefer immutable dependency versions.
 
+The local default `Dockerfile` applies the same dependency policy through a BuildKit cache mount named `tessera-dfe-maven`. The mount persists Maven release dependencies and build plugins between local container builds, is locked against concurrent writers, and is not copied into the resulting image. Maven invokes `dependency:purge-local-repository` with `snapshotsOnly=true` and `reResolve=false` before dependency resolution and again after the build, including the failed-build path. The cleanup plugin and its release dependencies are retained by the same persistent cache mount after the initial warm-up.
+
+Local Maven transfer progress remains enabled for diagnostics. A warm cache naturally produces few or no download messages; SNAPSHOT metadata checks remain visible because the local build uses `-U`.
+
+`docker.build.sh` enables BuildKit and supplies a unique `LOCAL_BUILD_NONCE` build argument on every invocation. The Dockerfile consumes the nonce before project `COPY` and `RUN` instructions, so those instructions execute on every local build while the Maven repository remains reusable through its named cache mount. The script deliberately does not pass Compose `--no-cache`: Docker Desktop versions differ in how that flag treats exec cache mounts, and some recreate the Maven mount along with the layer cache. Base-image metadata and frontend layers can still be reported as cached; they do not contain project build output.
+
 ## 5. Image tag policy
 
 | Tag | Source | Mutability |

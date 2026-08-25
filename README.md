@@ -329,7 +329,7 @@ To stop the environment and remove associated containers, volumes, and images:
 ./docker.down.sh
 ```
 
-In development mode, the system uses `docker-compose.develop.yml`. Instead of pulling a prebuilt image, it builds the image locally from the self-contained default `Dockerfile` and tags it as `develop`. `Dockerfile.ci` is reserved for CI and expects the already verified JAR staged by the workflow. This mode also mounts an additional directory `./flight_recording/` into `/tmp/flight_recording/` inside the container and enables Java Flight Recorder (JFR) through `JAVA_TOOL_OPTIONS`. This allows deeper runtime diagnostics and performance analysis.
+In development mode, the system uses `docker-compose.develop.yml`. Instead of pulling a prebuilt image, it builds the image locally from the self-contained default `Dockerfile` and tags it as `develop`. BuildKit retains immutable Maven dependencies in a dedicated cache mount while SNAPSHOT dependencies are refreshed on every build. `docker.build.sh` disables Docker layer caching, so source copying and Maven packaging are always executed; only the dedicated Maven dependency cache is retained. `Dockerfile.ci` is reserved for CI and expects the already verified JAR staged by the workflow. This mode also mounts an additional directory `./flight_recording/` into `/tmp/flight_recording/` inside the container and enables Java Flight Recorder (JFR) through `JAVA_TOOL_OPTIONS`. This allows deeper runtime diagnostics and performance analysis.
 
 Development mode uses the same in-process project revision watcher as production mode. Replacing the selected ZIP archive triggers project runtime reload without rebuilding or restarting the container.
 
