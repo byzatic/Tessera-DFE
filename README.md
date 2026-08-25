@@ -299,7 +299,7 @@ The heap is the memory area where objects are allocated and where garbage collec
 
 ### Running in Docker
 
-This document describes in detail how to run Tessera-DFE using Docker and Docker Compose. The project provides two execution modes: a production-like mode based on a prebuilt image (`latest`), and a development mode that builds the image locally from the Dockerfile. Both modes rely on mounted directories for configuration, project sources, and logs, and both are controlled through the provided shell scripts.
+This document describes in detail how to run Tessera-DFE using Docker and Docker Compose. The project provides two execution modes: a production-like mode based on a prebuilt image (`latest`), and a development mode that builds the image locally from the default `Dockerfile`. Both modes rely on mounted directories for configuration, project sources, and logs, and both are controlled through the provided shell scripts.
 
 Before starting, ensure that Docker and Docker Compose (or Docker Compose v2) are installed and available in your environment. All commands below are expected to be executed from the root directory of the repository, where the `docker-compose.yml`, `docker-compose.develop.yml`, and helper scripts are located.
 
@@ -329,7 +329,7 @@ To stop the environment and remove associated containers, volumes, and images:
 ./docker.down.sh
 ```
 
-In development mode, the system uses `docker-compose.develop.yml`. Instead of pulling a prebuilt image, it builds the image locally from the provided Dockerfile and tags it as `develop`. This mode also mounts an additional directory `./flight_recording/` into `/tmp/flight_recording/` inside the container and enables Java Flight Recorder (JFR) through `JAVA_TOOL_OPTIONS`. This allows deeper runtime diagnostics and performance analysis.
+In development mode, the system uses `docker-compose.develop.yml`. Instead of pulling a prebuilt image, it builds the image locally from the self-contained default `Dockerfile` and tags it as `develop`. `Dockerfile.ci` is reserved for CI and expects the already verified JAR staged by the workflow. This mode also mounts an additional directory `./flight_recording/` into `/tmp/flight_recording/` inside the container and enables Java Flight Recorder (JFR) through `JAVA_TOOL_OPTIONS`. This allows deeper runtime diagnostics and performance analysis.
 
 Development mode uses the same in-process project revision watcher as production mode. Replacing the selected ZIP archive triggers project runtime reload without rebuilding or restarting the container.
 

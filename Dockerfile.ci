@@ -1,12 +1,3 @@
-FROM --platform=linux/amd64 docker.io/maven:3.8.6-eclipse-temurin-17 AS build
-
-WORKDIR /app
-
-COPY pom.xml .
-COPY src ./src
-
-RUN mvn package -DskipTests -U --batch-mode
-
 FROM --platform=linux/amd64 docker.io/eclipse-temurin:17-jre-jammy
 
 RUN apt-get update && \
@@ -21,7 +12,7 @@ RUN mkdir -p \
     /app/configurations \
     /app/logs
 
-COPY --from=build /app/target/tessera-dfe-*-jar-with-dependencies.jar /app/app.jar
+COPY ci-artifact/app.jar /app/app.jar
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
 ENV DATA_DIRECTORY="/app/data" \

@@ -26,8 +26,10 @@ flowchart LR
     PUB --> RCI["Reusable ci.yml"]
     CI --> TEST["Maven verify"]
     RCI --> TEST2["Maven verify"]
-    TEST --> DB["Buildah build without push"]
-    TEST2 --> DB2["Buildah build without push"]
+    TEST --> JAR["Verified JAR artifact"]
+    TEST2 --> JAR2["Verified JAR artifact"]
+    JAR --> DB["Buildah runtime image"]
+    JAR2 --> DB2["Buildah runtime image"]
     DB2 --> ART["OCI archive + SHA-256 artifact"]
     ART --> VERIFY["Download and checksum verification"]
     VERIFY --> TAG["Buildah tag without rebuild"]
@@ -47,6 +49,15 @@ flowchart LR
 
 Supporting scripts are stored under `.github/scripts`. Tag normalization must always use `normalize-docker-tag.sh`; Docker Hub authentication must always use `dockerhub-token.sh`.
 
+### Dockerfile roles
+
+| File | Intended use | Compilation behavior |
+| --- | --- | --- |
+| `Dockerfile` | Local and Docker Compose development builds | Self-contained Maven compilation inside the build stage |
+| `Dockerfile.ci` | CI and release image assembly | Runtime-only; copies the JAR already produced and verified by Maven CI |
+
+`Dockerfile.ci` must never invoke Maven or compile Java sources. The default `Dockerfile` preserves the ability to build directly from a source checkout without first installing Maven on the host.
+
 ## 3. Trigger and control matrix
 
 | Event | CI | Publish | Cleanup |
@@ -65,13 +76,29 @@ Supporting scripts are stored under `.github/scripts`. Tag normalization must al
 
 For a main or release publication, `publish.yml` invokes `ci.yml` with `export_image=true`.
 
-The Buildah image job performs the following sequence:
+The CI jobs perform the following sequence:
 
-1. Run the complete Maven verification lifecycle.
-2. Build `localhost/tessera-data-flow-engine:ci` with `buildah bud` and without registry credentials.
-3. Export that image as an OCI archive using `buildah push` with the `oci-archive` transport.
-4. Generate `tessera-container-image.tar.sha256`.
-5. Upload the archive and checksum as the immutable `tessera-container-image` workflow artifact.
+1. Run the complete Maven verification lifecycle exactly once.
+2. Render the Surefire and Failsafe JUnit XML results into the GitHub Actions job summary and a standalone HTML report.
+3. Upload the HTML and source XML as the `test-report` artifact with 14-day retention, including when tests fail.
+4. Select exactly one `jar-with-dependencies` output and stage it as `app.jar`.
+5. Generate `app.jar.sha256` and upload the verified JAR as the immutable `tessera-application` workflow artifact.
+6. Download and verify that JAR in the Buildah job.
+7. Build `localhost/tessera-data-flow-engine:ci` from `Dockerfile.ci`; the Dockerfile only assembles the runtime filesystem and does not compile the application.
+8. Export the image as an OCI archive using `buildah push` with the `oci-archive` transport.
+9. Generate `tessera-container-image.tar.sha256`.
+10. Upload the archive and checksum as the immutable `tessera-container-image` workflow artifact.
+
+### Pull request presentation
+
+Every pull request exposes two independent status checks:
+
+- `Tests and application artifact` — Maven verification and the test report;
+- `Container build with Buildah` — assembly of the runtime image from the verified JAR.
+
+The compact test result is displayed on the workflow run Summary page. The complete self-contained HTML report and the original JUnit XML files are downloadable from the `test-report` artifact. The workflow deliberately does not deploy reports to GitHub Pages and does not post persistent PR comments: both approaches add permissions, lifecycle management, and noise without improving the required-check signal.
+
+Configure both job names as required status checks in the `main` branch ruleset. A pull request must not be mergeable while either check is missing, failing, or pending.
 
 The publish job then:
 
@@ -82,7 +109,7 @@ The publish job then:
 5. Adds the required Docker Hub tags without rebuilding.
 6. Pushes each tag to Docker Hub.
 
-The artifact is retained for one day. It is an internal handoff object, not a distribution channel or long-term backup.
+Both handoff artifacts are retained for one day. They are internal workflow objects, not a distribution channel or long-term backup.
 
 ## 5. Image tag policy
 
@@ -191,11 +218,13 @@ Re-run the successful publish workflow for the desired main commit while its art
 
 Check, in order:
 
-1. The CI Buildah image build completed successfully.
-2. The artifact upload step produced `tessera-container-image`.
-3. The download step ran in the same workflow run.
-4. The SHA-256 file and archive were downloaded into the same directory.
-5. The Buildah container supports the `oci-archive` transport.
+1. Maven verification produced exactly one `jar-with-dependencies` file.
+2. The `tessera-application` artifact passed its SHA-256 verification in the Buildah job.
+3. The CI Buildah image build completed successfully using `Dockerfile.ci`.
+4. The artifact upload step produced `tessera-container-image`.
+5. The download step ran in the same workflow run.
+6. The SHA-256 file and OCI archive were downloaded into the same directory.
+7. The Buildah container supports the `oci-archive` transport.
 
 Do not bypass a checksum failure. Re-run CI to create a new artifact.
 
@@ -208,6 +237,7 @@ Every CI/CD change should include:
 - review of secret and token permissions;
 - validation that PR jobs cannot reach registry credentials;
 - a cleanup dry-run when retention logic changes;
+- confirmation that `Dockerfile.ci` contains no Maven or Java compilation step;
 - confirmation that publish contains no Buildah build command;
 - corresponding updates to this document and the README tag policy.
 
