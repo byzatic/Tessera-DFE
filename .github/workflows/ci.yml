@@ -38,30 +38,19 @@ jobs:
       - name: Build and test with Maven
         run: mvn clean verify -U --batch-mode --no-transfer-progress
 
-      - name: Generate Surefire HTML report
-        if: ${{ !cancelled() }}
-        continue-on-error: true
+      - name: Render test report
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          mvn \
-            org.apache.maven.plugins:maven-surefire-report-plugin:3.5.4:report-only \
-            --batch-mode \
-            --no-transfer-progress \
-            -DoutputName=index \
-            -DlinkXRef=false
-          mv target/reports target/test-report
-
-      - name: Publish test summary
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: test-summary/action@37b508cfee6d4d080eedd00b5bb240a6a784a6a5 # v2.6
-        with:
-          paths: |
+          shopt -s nullglob
+          reports=(
             target/surefire-reports/TEST-*.xml
             target/failsafe-reports/TEST-*.xml
-          show: "fail, skip"
-          folded: true
+          )
+          python3 .github/scripts/render-test-report.py \
+            --output target/test-report/index.html \
+            "${reports[@]}"
 
       - name: Upload test report
         id: upload-test-report
@@ -73,7 +62,7 @@ jobs:
             target/test-report/
             target/surefire-reports/TEST-*.xml
             target/failsafe-reports/TEST-*.xml
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
 
       - name: Add test report link to summary
