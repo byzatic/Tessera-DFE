@@ -113,6 +113,18 @@ The publish job then:
 
 Both handoff artifacts are retained for one day. They are internal workflow objects, not a distribution channel or long-term backup.
 
+### Maven dependency cache and SNAPSHOT policy
+
+CI caches the local Maven repository to avoid downloading immutable release dependencies on every run. Mutable SNAPSHOT dependencies are excluded from that trust boundary:
+
+1. Immediately after cache restoration, Maven purges cached SNAPSHOT dependencies without re-resolving them.
+2. `mvn clean verify -U` resolves the current SNAPSHOT metadata and artifacts from the configured repository.
+3. Before the `setup-java` post-job cache save, Maven purges SNAPSHOT dependencies again.
+
+Consequently, the saved cache contains reusable release dependencies but does not intentionally persist mutable project SNAPSHOT dependencies between workflow runs. Cache cleanup by deleted Git branch is unnecessary because the Maven cache identity is derived from dependency-definition files rather than the branch name.
+
+This policy guarantees freshness relative to the repository contents available during a run; it does not make mutable SNAPSHOT coordinates reproducible. Production releases should prefer immutable dependency versions.
+
 ## 5. Image tag policy
 
 | Tag | Source | Mutability |

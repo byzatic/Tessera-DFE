@@ -36,6 +36,16 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Purge restored SNAPSHOT dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn dependency:purge-local-repository \
+            -DsnapshotsOnly=true \
+            -DreResolve=false \
+            --batch-mode \
+            --no-transfer-progress
+
       - name: Build and test with Maven
         run: mvn clean verify -U --batch-mode --no-transfer-progress
 
@@ -102,6 +112,17 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 1
+
+      - name: Exclude SNAPSHOT dependencies from saved cache
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn dependency:purge-local-repository \
+            -DsnapshotsOnly=true \
+            -DreResolve=false \
+            --batch-mode \
+            --no-transfer-progress
 
   buildah-build:
     # Keep this check name stable after adding it to the main branch ruleset.
