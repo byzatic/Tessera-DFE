@@ -1,0 +1,174 @@
+name: Publish Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-mutation
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Required CI
+    uses: ./.github/workflows/ci.yml
+    with:
+      export_image: true
+
+  publish:
+    name: Publish Docker image
+    needs: ci
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: quay.io/buildah/stable:latest
+      options: --privileged
+    env:
+      IMAGE_NAME: tessera-data-flow-engine
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Resolve image tags
+        id: tags
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+            source_ref="$RELEASE_TAG"
+          else
+            source_ref="$GITHUB_REF_NAME"
+          fi
+
+          source_tag="$(.github/scripts/normalize-docker-tag.sh "$source_ref")"
+          is_main=false
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            is_main=true
+          fi
+
+          echo "source_tag=$source_tag" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=sha-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "is_main=$is_main" >> "$GITHUB_OUTPUT"
+          echo "Resolved image tag: $source_tag"
+
+      - name: Install xmllint
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v xmllint >/dev/null 2>&1; then
+            exit 0
+          elif command -v microdnf >/dev/null 2>&1; then
+            microdnf -y install libxml2
+          elif command -v dnf >/dev/null 2>&1; then
+            dnf -y install libxml2
+          else
+            apt-get update
+            apt-get install -y libxml2-utils
+          fi
+
+      - name: Read project version
+        id: pom
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(xmllint --xpath 'string(/*[local-name()="project"]/*[local-name()="version"])' pom.xml)"
+          if [[ -z "$version" ]]; then
+            version="$(xmllint --xpath 'string(/*[local-name()="project"]/*[local-name()="parent"]/*[local-name()="version"])' pom.xml)"
+          fi
+          if [[ -z "$version" ]]; then
+            echo "::error::Unable to read the project version from pom.xml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Reject SNAPSHOT versions on main
+        if: steps.tags.outputs.is_main == 'true'
+        shell: bash
+        env:
+          POM_VERSION: ${{ steps.pom.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$POM_VERSION" == *-SNAPSHOT ]]; then
+            echo "::error::main cannot publish a SNAPSHOT version: $POM_VERSION"
+            exit 1
+          fi
+
+      - name: Validate release version
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          POM_VERSION: ${{ steps.pom.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_version="${RELEASE_TAG#v}"
+          if [[ "$release_version" != "$POM_VERSION" ]]; then
+            echo "::error::Release tag $RELEASE_TAG does not match POM version $POM_VERSION"
+            exit 1
+          fi
+
+      - name: Login to Docker Hub
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$DOCKERHUB_TOKEN" | buildah login \
+            --username "$DOCKERHUB_USERNAME" \
+            --password-stdin docker.io
+
+      - name: Download verified Docker image
+        uses: actions/download-artifact@v8
+        with:
+          name: tessera-container-image
+          path: ${{ runner.temp }}/tessera-container-image
+
+      - name: Verify, tag, and push image
+        shell: bash
+        env:
+          SOURCE_TAG: ${{ steps.tags.outputs.source_tag }}
+          SHA_TAG: ${{ steps.tags.outputs.sha_tag }}
+          IS_MAIN: ${{ steps.tags.outputs.is_main }}
+          POM_VERSION: ${{ steps.pom.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          artifact_dir="$RUNNER_TEMP/tessera-container-image"
+          (
+            cd "$artifact_dir"
+            sha256sum --check tessera-container-image.tar.sha256
+          )
+
+          verified_image_id="$(
+            buildah pull --quiet \
+              "oci-archive:${artifact_dir}/tessera-container-image.tar"
+          )"
+          buildah inspect "$verified_image_id" >/dev/null
+
+          image="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
+          tags=("$SHA_TAG" "$SOURCE_TAG")
+          if [[ "$IS_MAIN" == "true" ]]; then
+            tags+=(latest)
+          elif [[ "$GITHUB_EVENT_NAME" == "release" && "$SOURCE_TAG" != "$POM_VERSION" ]]; then
+            tags+=("$POM_VERSION")
+          fi
+
+          for tag in "${tags[@]}"; do
+            buildah tag "$verified_image_id" "$image:$tag"
+          done
+
+          for tag in "${tags[@]}"; do
+            buildah push "$image:$tag"
+          done

@@ -1,4 +1,4 @@
-![Build](https://github.com/byzatic/Tessera-DFE/actions/workflows/main.yml/badge.svg)
+[![CI](https://github.com/byzatic/Tessera-DFE/actions/workflows/ci.yml/badge.svg)](https://github.com/byzatic/Tessera-DFE/actions/workflows/ci.yml)
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Java](https://img.shields.io/badge/Java-17-orange)
@@ -20,6 +20,7 @@ Tessera Data Flow Engine is a modular execution system based on directed acyclic
 - [Конфигурирование Tessera DFE](.docs%2Fengine%2Fconfiguration%2FRU_README_Tessera_Configuration.md)
 - [Общая структура проекта Tessera-DFE](.docs%2Fproject%2FRU_README_Main.md)
 - [Observability Tessera DFE](.docs%2Fobservability%2FRU_README_Tessera_Observability.md)
+- [CI/CD Operations and Governance](.docs%2Fci-cd%2FREADME.md)
 
 ---
 
@@ -44,9 +45,9 @@ The first option is container-based distribution. The engine is available as a p
 https://hub.docker.com/r/byzatic/tessera-data-flow-engine
 
 Images are versioned and can be pulled using:
-- a semantic version corresponding to the pom.xml version from the main branch,
-- a tag matching a specific GitHub branch name,
-- or the latest tag for the most recent stable build.
+- `latest` or `main` for the most recently published commit on the main branch,
+- `sha-<full-commit-sha>` for an immutable commit identifier,
+- or a semantic version published from a GitHub release whose tag matches the version in `pom.xml`.
 
 This model enables fast deployment in containerized environments and simplifies integration into CI/CD pipelines, orchestration platforms, or infrastructure-as-code workflows. It eliminates the need for local builds and ensures consistent runtime environments across installations.
 
