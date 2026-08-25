@@ -1,4 +1,4 @@
-![Build](https://github.com/byzatic/Tessera-DFE/actions/workflows/main.yml/badge.svg)
+[![CI](https://github.com/byzatic/Tessera-DFE/actions/workflows/ci.yml/badge.svg)](https://github.com/byzatic/Tessera-DFE/actions/workflows/ci.yml)
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Java](https://img.shields.io/badge/Java-17-orange)
@@ -20,6 +20,7 @@ Tessera Data Flow Engine is a modular execution system based on directed acyclic
 - [Конфигурирование Tessera DFE](.docs%2Fengine%2Fconfiguration%2FRU_README_Tessera_Configuration.md)
 - [Общая структура проекта Tessera-DFE](.docs%2Fproject%2FRU_README_Main.md)
 - [Observability Tessera DFE](.docs%2Fobservability%2FRU_README_Tessera_Observability.md)
+- [CI/CD Operations and Governance](.docs%2Fci-cd%2FREADME.md)
 
 ---
 
@@ -44,9 +45,9 @@ The first option is container-based distribution. The engine is available as a p
 https://hub.docker.com/r/byzatic/tessera-data-flow-engine
 
 Images are versioned and can be pulled using:
-- a semantic version corresponding to the pom.xml version from the main branch,
-- a tag matching a specific GitHub branch name,
-- or the latest tag for the most recent stable build.
+- `latest` or `main` for the most recently published commit on the main branch,
+- `sha-<full-commit-sha>` for an immutable commit identifier,
+- or a semantic version published from a GitHub release whose tag matches the version in `pom.xml`.
 
 This model enables fast deployment in containerized environments and simplifies integration into CI/CD pipelines, orchestration platforms, or infrastructure-as-code workflows. It eliminates the need for local builds and ensures consistent runtime environments across installations.
 
@@ -298,7 +299,7 @@ The heap is the memory area where objects are allocated and where garbage collec
 
 ### Running in Docker
 
-This document describes in detail how to run Tessera-DFE using Docker and Docker Compose. The project provides two execution modes: a production-like mode based on a prebuilt image (`latest`), and a development mode that builds the image locally from the Dockerfile. Both modes rely on mounted directories for configuration, project sources, and logs, and both are controlled through the provided shell scripts.
+This document describes in detail how to run Tessera-DFE using Docker and Docker Compose. The project provides two execution modes: a production-like mode based on a prebuilt image (`latest`), and a development mode that builds the image locally from the default `Dockerfile`. Both modes rely on mounted directories for configuration, project sources, and logs, and both are controlled through the provided shell scripts.
 
 Before starting, ensure that Docker and Docker Compose (or Docker Compose v2) are installed and available in your environment. All commands below are expected to be executed from the root directory of the repository, where the `docker-compose.yml`, `docker-compose.develop.yml`, and helper scripts are located.
 
@@ -328,9 +329,42 @@ To stop the environment and remove associated containers, volumes, and images:
 ./docker.down.sh
 ```
 
-In development mode, the system uses `docker-compose.develop.yml`. Instead of pulling a prebuilt image, it builds the image locally from the provided Dockerfile and tags it as `develop`. This mode also mounts an additional directory `./flight_recording/` into `/tmp/flight_recording/` inside the container and enables Java Flight Recorder (JFR) through `JAVA_TOOL_OPTIONS`. This allows deeper runtime diagnostics and performance analysis.
+In development mode, the system uses `docker-compose.develop.yml`. Instead of pulling a prebuilt image, it builds the image locally from the self-contained default `Dockerfile` and tags it as `develop`. BuildKit retains immutable Maven dependencies in a dedicated cache mount while SNAPSHOT dependencies are refreshed on every build. `docker.build.sh` disables Docker layer caching, so source copying and Maven packaging are always executed; only the dedicated Maven dependency cache is retained. `Dockerfile.ci` is reserved for CI and expects the already verified JAR staged by the workflow. This mode also mounts an additional directory `./flight_recording/` into `/tmp/flight_recording/` inside the container and enables Java Flight Recorder (JFR) through `JAVA_TOOL_OPTIONS`. This allows deeper runtime diagnostics and performance analysis.
 
 Development mode uses the same in-process project revision watcher as production mode. Replacing the selected ZIP archive triggers project runtime reload without rebuilding or restarting the container.
+
+#### Project reload integration tests
+
+The repository includes a Docker-based integration test runner for the project archives in
+`.develop/INPUT_EXAMPLES/test_projects`. Every numeric marker file is interpreted as the
+expected number of lines returned by `GET http://localhost:8080/metrics`; for example,
+`s10/276` expects 276 lines after installing the `s10` archive.
+
+Each case starts a fresh container with `beggin/MyAwsomeProject.zip`, waits until the API
+returns 60 lines for several consecutive requests, atomically installs the case archive,
+and then waits for the case-specific line count. HTTP requests and both phases have bounded
+timeouts, so a stopped or hung application fails the test instead of blocking the suite.
+Container logs, the last HTTP responses, inspection data, and a TSV summary are saved under
+`target/project-integration-tests/`.
+
+Run all numeric cases using an already built development image:
+
+```bash
+./integration-tests.sh
+```
+
+Build the image first or select individual cases:
+
+```bash
+./integration-tests.sh --build
+./integration-tests.sh s10 s100
+```
+
+Timeouts can be adjusted for slower machines without changing the script:
+
+```bash
+STARTUP_TIMEOUT_SECONDS=300 RELOAD_TIMEOUT_SECONDS=600 ./integration-tests.sh s100
+```
 
 To build the development image:
 

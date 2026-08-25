@@ -1,0 +1,237 @@
+name: Docker Hub Cleanup
+
+on:
+  delete:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report tags without deleting them
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dockerhub-mutation
+  cancel-in-progress: false
+
+env:
+  DOCKERHUB_NAMESPACE: byzatic
+  DOCKERHUB_REPO: tessera-data-flow-engine
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  PAGE_SIZE: "100"
+
+jobs:
+  delete-branch-tag:
+    name: Delete tag for deleted branch
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BRANCH_NAME: ${{ github.event.ref }}
+
+    steps:
+      - name: Checkout cleanup scripts
+        uses: actions/checkout@v5
+
+      - name: Delete matching Docker Hub tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branch_tag="$(.github/scripts/normalize-docker-tag.sh "$BRANCH_NAME")"
+          token="$(.github/scripts/dockerhub-token.sh)"
+          tag_url="https://hub.docker.com/v2/repositories/${DOCKERHUB_NAMESPACE}/${DOCKERHUB_REPO}/tags/${branch_tag}/"
+          status="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: JWT $token" "$tag_url")"
+
+          if [[ "$status" == "404" ]]; then
+            echo "Tag does not exist: $branch_tag"
+            exit 0
+          fi
+          if [[ "$status" != "200" ]]; then
+            echo "::error::Unable to inspect tag $branch_tag (HTTP $status)"
+            exit 1
+          fi
+
+          curl -fsSL -X DELETE -H "Authorization: JWT $token" "$tag_url"
+          echo "Deleted tag: $branch_tag"
+
+  prune-feature-tags:
+    name: Prune orphaned feature tags
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PREFIX: feature-
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+
+    steps:
+      - name: Checkout cleanup scripts
+        uses: actions/checkout@v5
+
+      - name: Collect active branch tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          branches_file="$RUNNER_TEMP/remote-branches.txt"
+          tags_file="$RUNNER_TEMP/active-branch-tags.txt"
+
+          git ls-remote --heads "https://github.com/${GITHUB_REPOSITORY}.git" |
+            awk '{print $2}' |
+            sed 's#^refs/heads/##' |
+            sort -u > "$branches_file"
+
+          while IFS= read -r branch; do
+            .github/scripts/normalize-docker-tag.sh "$branch"
+          done < "$branches_file" | sort -u > "$tags_file"
+
+          echo "First active Docker tags:"
+          sed -n '1,20{s/^/ - /;p}' "$tags_file"
+
+      - name: Delete orphaned feature tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          token="$(.github/scripts/dockerhub-token.sh)"
+          repo_url="https://hub.docker.com/v2/repositories/${DOCKERHUB_NAMESPACE}/${DOCKERHUB_REPO}/tags"
+          next_url="${repo_url}/?page_size=${PAGE_SIZE}"
+          orphaned_tags_file="$RUNNER_TEMP/orphaned-feature-tags.txt"
+          : > "$orphaned_tags_file"
+          total=0
+          candidates=0
+          deleted=0
+
+          while [[ -n "$next_url" && "$next_url" != "null" ]]; do
+            page="$(curl -fsSL -H "Authorization: JWT $token" "$next_url")"
+            next_url="$(jq -r '.next // empty' <<< "$page")"
+
+            while IFS= read -r tag; do
+              [[ -z "$tag" ]] && continue
+              total=$((total + 1))
+              [[ "$tag" != "$PREFIX"* ]] && continue
+              candidates=$((candidates + 1))
+
+              if grep -Fqx -- "$tag" "$RUNNER_TEMP/active-branch-tags.txt"; then
+                echo "KEEP: $tag"
+                continue
+              fi
+
+              printf '%s\n' "$tag" >> "$orphaned_tags_file"
+            done < <(jq -r '.results[].name' <<< "$page")
+          done
+
+          sort -u -o "$orphaned_tags_file" "$orphaned_tags_file"
+          orphaned="$(wc -l < "$orphaned_tags_file" | tr -d ' ')"
+          echo "Pagination complete; orphaned feature tags: $orphaned"
+
+          while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "DRY-RUN: would delete $tag"
+            else
+              curl -fsSL -X DELETE \
+                -H "Authorization: JWT $token" \
+                "${repo_url}/${tag}/"
+              echo "Deleted: $tag"
+              deleted=$((deleted + 1))
+            fi
+          done < "$orphaned_tags_file"
+
+          echo "Tags scanned: $total; feature candidates: $candidates; deleted: $deleted"
+
+  prune-sha-tags:
+    name: Prune stale SHA tags
+    needs: prune-feature-tags
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout complete repository history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch branches, tags, and open pull request refs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --prune origin \
+            "+refs/heads/*:refs/remotes/origin/*" \
+            "+refs/tags/*:refs/tags/*"
+
+          open_prs_file="$RUNNER_TEMP/open-pr-numbers.txt"
+          gh api --paginate \
+            --jq '.[].number' \
+            "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" > "$open_prs_file"
+
+          while IFS= read -r pr_number; do
+            [[ -z "$pr_number" ]] && continue
+            git fetch origin \
+              "+refs/pull/${pr_number}/head:refs/remotes/pull/${pr_number}/head"
+            git fetch origin \
+              "+refs/pull/${pr_number}/merge:refs/remotes/pull/${pr_number}/merge" || true
+          done < "$open_prs_file"
+
+          echo "Protected open pull requests: $(wc -l < "$open_prs_file" | tr -d ' ')"
+
+      - name: Delete SHA tags for unreachable commits
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          token="$(.github/scripts/dockerhub-token.sh)"
+          repo_url="https://hub.docker.com/v2/repositories/${DOCKERHUB_NAMESPACE}/${DOCKERHUB_REPO}/tags"
+          next_url="${repo_url}/?page_size=${PAGE_SIZE}"
+          stale_tags_file="$RUNNER_TEMP/stale-sha-tags.txt"
+          : > "$stale_tags_file"
+          checked=0
+          deleted=0
+
+          while [[ -n "$next_url" && "$next_url" != "null" ]]; do
+            page="$(curl -fsSL -H "Authorization: JWT $token" "$next_url")"
+            next_url="$(jq -r '.next // empty' <<< "$page")"
+
+            while IFS= read -r tag; do
+              [[ "$tag" =~ ^sha-([0-9a-f]{7,40})$ ]] || continue
+              sha="${BASH_REMATCH[1]}"
+              checked=$((checked + 1))
+
+              if git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+                echo "KEEP: $tag"
+                continue
+              fi
+
+              printf '%s\n' "$tag" >> "$stale_tags_file"
+            done < <(jq -r '.results[].name' <<< "$page")
+          done
+
+          sort -u -o "$stale_tags_file" "$stale_tags_file"
+          stale="$(wc -l < "$stale_tags_file" | tr -d ' ')"
+          echo "Pagination complete; stale SHA tags: $stale"
+
+          while IFS= read -r tag; do
+            [[ -z "$tag" ]] && continue
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "DRY-RUN: would delete $tag"
+            else
+              curl -fsSL -X DELETE \
+                -H "Authorization: JWT $token" \
+                "${repo_url}/${tag}/"
+              echo "Deleted: $tag"
+              deleted=$((deleted + 1))
+            fi
+          done < "$stale_tags_file"
+
+          echo "SHA tags checked: $checked; deleted: $deleted"

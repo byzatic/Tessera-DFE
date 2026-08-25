@@ -1,4 +1,3 @@
-version: '3.7'
 services:
   tessera-dfe:
     image: byzatic/tessera-data-flow-engine:latest
@@ -28,7 +27,6 @@ networks:
   93849dcd429a-tessera-dfe:
     name: 93849dcd429a-tessera-dfe
     external: false
-
 
 
 

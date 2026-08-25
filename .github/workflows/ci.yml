@@ -1,0 +1,187 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      export_image:
+        description: Export the verified Docker image for the publish workflow
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    # Keep this check name stable: it is referenced by the main branch ruleset.
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+          cache: maven
+
+      - name: Purge restored SNAPSHOT dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn dependency:purge-local-repository \
+            -DsnapshotsOnly=true \
+            -DreResolve=false \
+            --batch-mode \
+            --no-transfer-progress
+
+      - name: Build and test with Maven
+        run: mvn clean verify -U --batch-mode --no-transfer-progress
+
+      - name: Render test report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          reports=(
+            target/surefire-reports/TEST-*.xml
+            target/failsafe-reports/TEST-*.xml
+          )
+          python3 .github/scripts/render-test-report.py \
+            --output target/test-report/index.html \
+            "${reports[@]}"
+
+      - name: Upload test report
+        id: upload-test-report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-report
+          path: |
+            target/test-report/
+            target/surefire-reports/TEST-*.xml
+            target/failsafe-reports/TEST-*.xml
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Add test report link to summary
+        if: always() && steps.upload-test-report.outputs.artifact-url != ''
+        shell: bash
+        env:
+          TEST_REPORT_URL: ${{ steps.upload-test-report.outputs.artifact-url }}
+        run: |
+          printf '[Download the complete HTML and JUnit XML report](%s)\n' \
+            "$TEST_REPORT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stage verified application JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          jars=(target/tessera-dfe-*-jar-with-dependencies.jar)
+          if (( ${#jars[@]} != 1 )); then
+            echo "::error::Expected exactly one jar-with-dependencies, found ${#jars[@]}"
+            exit 1
+          fi
+
+          artifact_dir="$RUNNER_TEMP/tessera-application"
+          mkdir -p "$artifact_dir"
+          install -m 0644 "${jars[0]}" "$artifact_dir/app.jar"
+          (
+            cd "$artifact_dir"
+            sha256sum app.jar > app.jar.sha256
+          )
+
+      - name: Upload verified application JAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: tessera-application
+          path: ${{ runner.temp }}/tessera-application/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+      - name: Exclude SNAPSHOT dependencies from saved cache
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn dependency:purge-local-repository \
+            -DsnapshotsOnly=true \
+            -DreResolve=false \
+            --batch-mode \
+            --no-transfer-progress
+
+  buildah-build:
+    # Keep this check name stable after adding it to the main branch ruleset.
+    name: build
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: quay.io/buildah/stable:latest
+      options: --privileged
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download verified application JAR
+        uses: actions/download-artifact@v8
+        with:
+          name: tessera-application
+          path: ${{ github.workspace }}/ci-artifact
+
+      - name: Verify application JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd ci-artifact
+            sha256sum --check app.jar.sha256
+          )
+
+      - name: Build container image
+        shell: bash
+        run: |
+          set -euo pipefail
+          buildah bud \
+            --tag localhost/tessera-data-flow-engine:ci \
+            --file Dockerfile.ci .
+
+      - name: Export verified OCI image
+        if: inputs.export_image
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/tessera-container-image"
+          mkdir -p "$artifact_dir"
+          buildah push \
+            localhost/tessera-data-flow-engine:ci \
+            "oci-archive:${artifact_dir}/tessera-container-image.tar"
+          (
+            cd "$artifact_dir"
+            sha256sum tessera-container-image.tar > tessera-container-image.tar.sha256
+          )
+
+      - name: Upload verified OCI image
+        if: inputs.export_image
+        uses: actions/upload-artifact@v7
+        with:
+          name: tessera-container-image
+          path: ${{ runner.temp }}/tessera-container-image/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
