@@ -19,7 +19,8 @@ permissions:
 
 jobs:
   test:
-    name: Tests and application artifact
+    # Keep this check name stable: it is referenced by the main branch ruleset.
+    name: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -102,7 +103,8 @@ jobs:
           retention-days: 1
 
   buildah-build:
-    name: Container build with Buildah
+    # Keep this check name stable after adding it to the main branch ruleset.
+    name: build
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30

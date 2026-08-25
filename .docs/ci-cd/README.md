@@ -93,12 +93,12 @@ The CI jobs perform the following sequence:
 
 Every pull request exposes two independent status checks:
 
-- `Tests and application artifact` — Maven verification and the test report;
-- `Container build with Buildah` — assembly of the runtime image from the verified JAR.
+- `test` — Maven verification, application artifact, and the test report;
+- `build` — assembly of the runtime image from the verified JAR using Buildah.
 
 The compact test result is displayed on the workflow run Summary page. The complete self-contained HTML report and the original JUnit XML files are downloadable from the `test-report` artifact. The workflow deliberately does not deploy reports to GitHub Pages and does not post persistent PR comments: both approaches add permissions, lifecycle management, and noise without improving the required-check signal.
 
-Configure both job names as required status checks in the `main` branch ruleset. A pull request must not be mergeable while either check is missing, failing, or pending.
+Configure the stable `test` and `build` names as required status checks in the `main` branch ruleset. These names are an external contract and must not be changed without updating the ruleset in the same rollout. A pull request must not be mergeable while either check is missing, failing, or pending.
 
 The publish job then:
 
