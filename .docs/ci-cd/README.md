@@ -21,7 +21,7 @@ This document defines the build, verification, publication, and retention contro
 
 ```mermaid
 flowchart LR
-    A["Pull request or feature push"] --> CI["ci.yml"]
+    A["Pull request"] --> CI["ci.yml"]
     B["main push or GitHub release"] --> PUB["publish.yml"]
     PUB --> RCI["Reusable ci.yml"]
     CI --> TEST["Maven verify"]
@@ -63,7 +63,7 @@ Supporting scripts are stored under `.github/scripts`. Tag normalization must al
 | Event | CI | Publish | Cleanup |
 | --- | --- | --- | --- |
 | Pull request | Maven verify and Buildah image build | Never | No |
-| Push to non-main branch | Maven verify and Buildah image build | Never | No |
+| Push to non-main branch without a PR | No automatic run; use manual dispatch if required | Never | No |
 | Push to `main` | Called by publish workflow | `main`, `latest`, full SHA | No |
 | Published GitHub release | Called by publish workflow | Release tag, POM version, full SHA | No |
 | Deleted Git branch | No | No | Delete normalized branch tag |
@@ -99,6 +99,8 @@ Every pull request exposes two independent status checks:
 The compact test result is displayed on the workflow run Summary page. The complete self-contained HTML report and the original JUnit XML files are downloadable from the `test-report` artifact. The workflow deliberately does not deploy reports to GitHub Pages and does not post persistent PR comments: both approaches add permissions, lifecycle management, and noise without improving the required-check signal.
 
 Configure the stable `test` and `build` names as required status checks in the `main` branch ruleset. These names are an external contract and must not be changed without updating the ruleset in the same rollout. A pull request must not be mergeable while either check is missing, failing, or pending.
+
+CI is intentionally not triggered by both `push` and `pull_request`: a commit pushed to an open pull-request branch would otherwise create two equivalent runs. A newer commit to the same pull request cancels its obsolete in-progress CI run. Branches without a pull request can be checked with `workflow_dispatch`.
 
 The publish job then:
 
