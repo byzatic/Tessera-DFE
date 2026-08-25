@@ -79,7 +79,7 @@ For a main or release publication, `publish.yml` invokes `ci.yml` with `export_i
 The CI jobs perform the following sequence:
 
 1. Run the complete Maven verification lifecycle exactly once.
-2. Render the Surefire and Failsafe JUnit XML results into the GitHub Actions job summary and a standalone HTML report.
+2. Render the JUnit XML results into a standalone HTML report with the Apache Maven Surefire Report Plugin and into GitHub-flavored Markdown with the pinned `test-summary/action`.
 3. Upload the HTML and source XML as the `test-report` artifact with 14-day retention, including when tests fail.
 4. Select exactly one `jar-with-dependencies` output and stage it as `app.jar`.
 5. Generate `app.jar.sha256` and upload the verified JAR as the immutable `tessera-application` workflow artifact.
@@ -96,7 +96,7 @@ Every pull request exposes two independent status checks:
 - `test` — Maven verification, application artifact, and the test report;
 - `build` — assembly of the runtime image from the verified JAR using Buildah.
 
-The compact test result is displayed on the workflow run Summary page. The complete self-contained HTML report and the original JUnit XML files are downloadable from the `test-report` artifact. The workflow deliberately does not deploy reports to GitHub Pages and does not post persistent PR comments: both approaches add permissions, lifecycle management, and noise without improving the required-check signal.
+The compact test result is displayed on the workflow run Summary page. Failed and skipped test details are rendered in collapsible sections. The complete HTML report and the original JUnit XML files are downloadable from the `test-report` artifact. The workflow deliberately does not deploy reports to GitHub Pages and does not post persistent PR comments: both approaches add permissions, lifecycle management, and noise without improving the required-check signal.
 
 Configure the stable `test` and `build` names as required status checks in the `main` branch ruleset. These names are an external contract and must not be changed without updating the ruleset in the same rollout. A pull request must not be mergeable while either check is missing, failing, or pending.
 
