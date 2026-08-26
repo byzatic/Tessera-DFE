@@ -24,7 +24,6 @@ import io.github.byzatic.tessera.workflowroutine.workflowroutines.health.HealthF
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -48,7 +47,6 @@ public class PipelineManager implements PipelineManagerInterface {
     private static final Logger logger = LoggerFactory.getLogger(PipelineManager.class);
 
     private final ImmediateSchedulerInterface scheduler;
-    private final boolean ownsScheduler;
 
     private final GraphNodeRef graphNodeRef;
     private final List<GraphNodeRef> pathToCurrentExecutionNodeRef;
@@ -157,7 +155,6 @@ public class PipelineManager implements PipelineManagerInterface {
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.ownsScheduler = false;
 
         try {
             Objects.requireNonNull(pathManagerInterface, "pathManagerInterface");
@@ -178,42 +175,6 @@ public class PipelineManager implements PipelineManagerInterface {
         }
 
         // Ключевое: ставим terminal hub listener ровно один раз на scheduler
-        hubFor(this.scheduler);
-    }
-
-    // ===== Constructor with self-hosted scheduler =====
-    public PipelineManager(GraphNodeRef graphNodeRef,
-                           List<GraphNodeRef> pathToCurrentExecutionNodeRef,
-                           FullProjectRepository fullProjectRepository,
-                           UnifiedRoutineFactory routineFactory,
-                           StorageManagerInterface storageManager,
-                           PathManagerInterface pathManagerInterface,
-                           ExecutionContextFactoryInterface executionContextFactory) throws OperationIncompleteException {
-
-        this.graphNodeRef = Objects.requireNonNull(graphNodeRef, "graphNodeRef");
-        this.pathToCurrentExecutionNodeRef = Objects.requireNonNull(pathToCurrentExecutionNodeRef, "pathToCurrentExecutionNodeRef");
-        this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
-        this.routineFactory = Objects.requireNonNull(routineFactory, "routineFactory");
-        this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
-        this.executionContextFactory = Objects.requireNonNull(executionContextFactory, "executionContextFactory");
-
-        this.scheduler = new ImmediateScheduler.Builder()
-                .defaultGrace(Duration.ofSeconds(10))
-                .build();
-
-        this.ownsScheduler = true;
-
-        try {
-            Objects.requireNonNull(pathManagerInterface, "pathManagerInterface");
-            this.pathResolver = new SupportPathResolver(
-                    pathManagerInterface.getStoragePathByGraphNodeRef(graphNodeRef),
-                    pathManagerInterface.getProjectGlobalStorage()
-            );
-        } catch (Exception e) {
-            throw new OperationIncompleteException(e);
-        }
-
-        // Для self-hosted scheduler логика та же: hub listener ставится один раз
         hubFor(this.scheduler);
     }
 
@@ -380,9 +341,7 @@ public class PipelineManager implements PipelineManagerInterface {
     }
 
     public void close() {
-        if (ownsScheduler) {
-            try { scheduler.close(); } catch (Exception ignored) {}
-        }
+        // The process-scoped scheduler is owned by ApplicationExecutionRuntime.
     }
 
     /**

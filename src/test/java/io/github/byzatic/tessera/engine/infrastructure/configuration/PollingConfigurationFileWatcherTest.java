@@ -1,5 +1,10 @@
 package io.github.byzatic.tessera.engine.infrastructure.configuration;
 
+import io.github.byzatic.commons.schedulers.unified.Schedule;
+import io.github.byzatic.commons.schedulers.unified.ScheduleHandle;
+import io.github.byzatic.commons.schedulers.unified.ScheduleOptions;
+import io.github.byzatic.commons.schedulers.unified.ScheduledTask;
+import io.github.byzatic.commons.schedulers.unified.UnifiedSchedulerInterface;
 import io.github.byzatic.tessera.engine.application.runtime.ConfigurationCandidateValidator;
 import io.github.byzatic.tessera.engine.application.runtime.ConfigurationChangeListener;
 import org.junit.Rule;
@@ -14,10 +19,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class PollingConfigurationFileWatcherTest {
 
@@ -84,6 +94,55 @@ public class PollingConfigurationFileWatcherTest {
         } finally {
             watcher.close();
         }
+    }
+
+    @Test
+    public void closeCannotMissScheduleBeingRegisteredByStart() throws Exception {
+        Path configurationFile = temporaryFolder.newFile("configuration.xml").toPath();
+        Files.write(configurationFile, "initial".getBytes(StandardCharsets.UTF_8));
+        UnifiedSchedulerInterface scheduler = mock(UnifiedSchedulerInterface.class);
+        ScheduleHandle schedule = mock(ScheduleHandle.class);
+        CountDownLatch registrationEntered = new CountDownLatch(1);
+        CountDownLatch allowRegistrationToReturn = new CountDownLatch(1);
+        when(scheduler.schedule(
+                any(ScheduledTask.class),
+                any(Schedule.class),
+                any(ScheduleOptions.class)
+        )).thenAnswer(invocation -> {
+            registrationEntered.countDown();
+            allowRegistrationToReturn.await();
+            return schedule;
+        });
+        PollingConfigurationFileWatcher watcher = new PollingConfigurationFileWatcher(
+                configurationFile,
+                Duration.ofSeconds(1L),
+                () -> { },
+                () -> { },
+                scheduler
+        );
+        AtomicReference<Throwable> startFailure = new AtomicReference<>();
+        Thread starter = new Thread(() -> {
+            try {
+                watcher.start();
+            } catch (Throwable failure) {
+                startFailure.set(failure);
+            }
+        });
+        Thread closer = new Thread(watcher::close);
+
+        starter.start();
+        assertTrue(registrationEntered.await(1L, TimeUnit.SECONDS));
+        closer.start();
+        Thread.sleep(25L);
+        assertTrue("close must wait until the schedule handle is published", closer.isAlive());
+        allowRegistrationToReturn.countDown();
+        starter.join(1_000L);
+        closer.join(1_000L);
+
+        assertFalse(starter.isAlive());
+        assertFalse(closer.isAlive());
+        assertEquals(null, startFailure.get());
+        verify(schedule).cancel();
     }
 
     private static final class RecordingListener implements ConfigurationChangeListener {

@@ -1,10 +1,12 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager;
 
+import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.repository.storage.StorageManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
 import io.github.byzatic.tessera.engine.infrastructure.observability.PrometheusMetricsAgent;
+import io.github.byzatic.tessera.engine.infrastructure.runtime.ApplicationExecutionRuntime;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto.Node;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository.GraphManagerNodeRepositoryInterface;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.PipelineManagerFactoryInterface;
@@ -42,6 +44,8 @@ public class GraphManagerFactoryTest {
 
     private static String originalConfigurationFilePath;
     private static String originalDataDirectory;
+    private static ApplicationExecutionRuntime executionRuntime;
+    private static ImmediateSchedulerInterface scheduler;
 
     @BeforeClass
     public static void startMetricsAgent() throws Exception {
@@ -52,12 +56,16 @@ public class GraphManagerFactoryTest {
         Files.writeString(configurationFile, TEST_CONFIGURATION, StandardCharsets.UTF_8);
         System.setProperty("configFilePath", configurationFile.toString());
         System.setProperty("dataDirectory", dataDirectory.toString());
+        executionRuntime = ApplicationExecutionRuntime.createDefault();
+        scheduler = executionRuntime.immediateScheduler();
         PrometheusMetricsAgent.getInstance().start(new URI("http://127.0.0.1:0"));
     }
 
     @AfterClass
-    public static void stopMetricsAgent() {
+    public static void stopMetricsAgent() throws Exception {
         PrometheusMetricsAgent.getInstance().stop();
+        scheduler.close();
+        executionRuntime.close();
         if (originalConfigurationFilePath == null) {
             System.clearProperty("configFilePath");
         } else {
@@ -80,7 +88,7 @@ public class GraphManagerFactoryTest {
                 storageManager,
                 nodeRepository,
                 pipelineManagerFactory
-        ).create();
+        ).create(scheduler);
 
         graphManager.runGraph();
 
@@ -102,13 +110,17 @@ public class GraphManagerFactoryTest {
         when(nodeRepository.getRootNodes()).thenReturn(Collections.singletonList(rootRef));
         when(nodeRepository.getNode(rootRef)).thenReturn(root);
         when(nodeRepository.getNodeDownstream(root)).thenReturn(Collections.emptyList());
-        when(pipelineManagerFactory.getNewPipelineManager(eq(rootRef), anyList()))
+        when(pipelineManagerFactory.getNewPipelineManager(
+                eq(rootRef),
+                anyList(),
+                eq(scheduler)
+        ))
                 .thenReturn(pipelineManager);
         GraphManagerInterface graphManager = new GraphManagerFactory(
                 storageManager,
                 nodeRepository,
                 pipelineManagerFactory
-        ).create();
+        ).create(scheduler);
 
         graphManager.runGraph();
 
@@ -130,7 +142,7 @@ public class GraphManagerFactoryTest {
                 storageManager,
                 nodeRepository,
                 pipelineManagerFactory
-        ).create();
+        ).create(scheduler);
 
         try {
             graphManager.runGraph();

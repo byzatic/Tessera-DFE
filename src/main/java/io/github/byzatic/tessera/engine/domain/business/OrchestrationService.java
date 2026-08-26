@@ -1,9 +1,7 @@
 package io.github.byzatic.tessera.engine.domain.business;
 
-import io.github.byzatic.commons.schedulers.cron.CronScheduler;
 import io.github.byzatic.commons.schedulers.cron.CronSchedulerInterface;
 import io.github.byzatic.commons.schedulers.cron.CronTask;
-import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
 import io.github.byzatic.commons.schedulers.immediate.JobInfo;
@@ -89,16 +87,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         this.cronScheduler = cronScheduler;
         this.stopGrace = stopGrace;
         this.graphCron = normalizeCron(graphCron);
-    }
-
-    public OrchestrationService(@NotNull ServicesManagerFactoryInterface servicesManagerFactory,
-                                @NotNull GraphManagerFactoryInterface graphManagerFactory) {
-        this(servicesManagerFactory,
-                graphManagerFactory,
-                new ImmediateScheduler.Builder().defaultGrace(Duration.ofSeconds(10)).build(),
-                new CronScheduler.Builder().build(),
-                Duration.ofSeconds(10),
-                Configuration.CRON_EXPRESSION_STRING);
     }
 
     /**

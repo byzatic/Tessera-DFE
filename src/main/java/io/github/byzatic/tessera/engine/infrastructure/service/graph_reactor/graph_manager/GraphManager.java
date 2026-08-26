@@ -16,7 +16,6 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -39,7 +38,6 @@ public class GraphManager implements GraphManagerInterface {
     private final GraphTraversalInterface graphTraversal;
 
     private final ImmediateSchedulerInterface scheduler;
-    private final boolean ownsScheduler;
     private final StorageManagerInterface storageManager;
 
     /**
@@ -62,7 +60,6 @@ public class GraphManager implements GraphManagerInterface {
         this.pipelineManagerFactory = pipelineManagerFactory;
 
         this.scheduler = scheduler;
-        this.ownsScheduler = false;
         this.storageManager = storageManager;
 
         // как и раньше — один traversal на весь менеджер
@@ -75,38 +72,6 @@ public class GraphManager implements GraphManagerInterface {
             }
         }
         // лёгкий внутренний логер (опционально)
-        this.scheduler.addListener(new SilentLoggingListener());
-    }
-
-    /**
-     * Конструктор, создающий собственный ImmediateScheduler.
-     */
-    public GraphManager(@NotNull StorageManagerInterface storageManager,
-                        @NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
-                        @NotNull PipelineManagerFactoryInterface pipelineManagerFactory,
-                        JobEventListener... listeners) {
-        Objects.requireNonNull(storageManager, "storageManager");
-        ObjectsUtils.requireNonNull(graphManagerNodeRepository,
-                new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
-        ObjectsUtils.requireNonNull(pipelineManagerFactory,
-                new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull"));
-
-        this.graphManagerNodeRepository = graphManagerNodeRepository;
-        this.pipelineManagerFactory = pipelineManagerFactory;
-        this.storageManager = storageManager;
-
-        this.scheduler = new ImmediateScheduler.Builder()
-                .defaultGrace(Duration.ofSeconds(10))
-                .build();
-        this.ownsScheduler = true;
-
-        this.graphTraversal = new GraphTraversal(graphManagerNodeRepository, pipelineManagerFactory);
-
-        if (listeners != null) {
-            for (JobEventListener l : listeners) {
-                if (l != null) this.scheduler.addListener(l);
-            }
-        }
         this.scheduler.addListener(new SilentLoggingListener());
     }
 
@@ -233,13 +198,6 @@ public class GraphManager implements GraphManagerInterface {
             executionFailure = new OperationIncompleteException(t);
             throw executionFailure;
         } finally {
-            // Если шедуллер наш — закрываем ресурсы.
-            if (ownsScheduler) {
-                try {
-                    scheduler.close();
-                } catch (Exception ignored) {
-                }
-            }
             try {
                 clear();
             } catch (Throwable cleanupError) {

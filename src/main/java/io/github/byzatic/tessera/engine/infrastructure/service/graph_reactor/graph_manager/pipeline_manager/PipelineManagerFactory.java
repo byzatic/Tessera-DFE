@@ -45,8 +45,9 @@ public class PipelineManagerFactory implements PipelineManagerFactoryInterface {
             if (pipelineManagerClazz != null) {
                 pipelineManager = pipelineManagerClazz.getDeclaredConstructor().newInstance();
             } else {
-                pipelineManager = new PipelineManager(currentExecutionNodeRef, pathToCurrentExecutionNodeRef, fullProjectRepository, routineFactory, storageManager, pathManager, executionContextFactory);
-                return pipelineManager;
+                throw new IllegalStateException(
+                        "Production PipelineManager requires the process-scoped scheduler"
+                );
             }
         } catch (Exception e) {
             throw new OperationIncompleteException(e);

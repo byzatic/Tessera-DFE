@@ -67,11 +67,6 @@ public class ServicesManager implements ServicesManagerInterface {
      */
     private final AtomicReference<JobEventListener> externalListenerRef = new AtomicReference<>(null);
 
-    /**
-     * Владеем ли мы внутренним шедуллером (созданным в перегруженном конструкторе)
-     */
-    @SuppressWarnings("FieldCanBeLocal")
-    private final boolean ownsScheduler;
     private final FullProjectRepository fullProjectRepository;
 
     // ========= Конструктор №1: с внешним шедуллером =========
@@ -86,26 +81,6 @@ public class ServicesManager implements ServicesManagerInterface {
         this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
         this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.ownsScheduler = false;
-
-        loadDescriptors(fullProjectRepository);
-        wireListeners(listeners);
-    }
-
-    // ========= Конструктор №2: без шедуллера — создаём свой =========
-    public ServicesManager(
-            FullProjectRepository fullProjectRepository,
-            UnifiedServiceFactory serviceFactory,
-            StorageManagerInterface storageManager,
-            JobEventListener... listeners // optional
-    ) {
-        this.serviceFactory = Objects.requireNonNull(serviceFactory, "serviceFactory");
-        this.storageManager = Objects.requireNonNull(storageManager, "storageManager");
-        this.fullProjectRepository = Objects.requireNonNull(fullProjectRepository, "fullProjectRepository");
-        // Создаём дефолтный ImmediateScheduler через Builder (пул потоков и grace по умолчанию)
-        this.scheduler = new ImmediateScheduler.Builder().build();
-        this.ownsScheduler = true;
-
         loadDescriptors(fullProjectRepository);
         wireListeners(listeners);
     }
@@ -130,21 +105,25 @@ public class ServicesManager implements ServicesManagerInterface {
             @Override
             public void onComplete(UUID jobId) {
                 logger.debug("Service job {} completed ({})", jobId, serviceNameOf(jobId));
+                removeTerminalService(jobId);
             }
 
             @Override
             public void onError(UUID jobId, Throwable error) {
                 logger.warn("Service job {} failed ({}): {}", jobId, serviceNameOf(jobId), error.toString());
+                removeTerminalService(jobId);
             }
 
             @Override
             public void onTimeout(UUID jobId) {
                 logger.warn("Service job {} timed out ({})", jobId, serviceNameOf(jobId));
+                removeTerminalService(jobId);
             }
 
             @Override
             public void onCancelled(UUID jobId) {
                 logger.info("Service job {} cancelled ({})", jobId, serviceNameOf(jobId));
+                removeTerminalService(jobId);
             }
         });
     }
@@ -154,6 +133,22 @@ public class ServicesManager implements ServicesManagerInterface {
             if (e.getValue().equals(jobId)) return e.getKey();
         }
         return "?";
+    }
+
+    private void removeTerminalService(UUID jobId) {
+        if (jobId == null) return;
+        runningServices.remove(jobId);
+        serviceNameToJobId.entrySet().removeIf(entry -> jobId.equals(entry.getValue()));
+    }
+
+    private void removeIfAlreadyTerminal(UUID jobId) {
+        Optional<JobInfo> info = scheduler.query(jobId);
+        if (info.isEmpty()) return;
+        JobState state = info.get().state;
+        if (state == JobState.COMPLETED || state == JobState.FAILED
+                || state == JobState.CANCELLED || state == JobState.TIMEOUT) {
+            removeTerminalService(jobId);
+        }
     }
 
     private void loadDescriptors(FullProjectRepository fullProjectRepository) {
@@ -185,7 +180,7 @@ public class ServicesManager implements ServicesManagerInterface {
     }
 
     @Override
-    public void runAllServices() throws OperationIncompleteException {
+    public synchronized void runAllServices() throws OperationIncompleteException {
         logger.debug("Requested run all services");
         try {
             for (ServiceDescriptor sd : serviceDescriptorsById.values()) {
@@ -198,7 +193,8 @@ public class ServicesManager implements ServicesManagerInterface {
                         logger.debug("Service {} already scheduled/running as {}", sd.getServiceName(), existing);
                         continue;
                     }
-                    serviceNameToJobId.remove(sd.getServiceName());
+                    serviceNameToJobId.remove(sd.getServiceName(), existing);
+                    runningServices.remove(existing);
                 }
 
                 // MDC/ExecutionContext
@@ -236,6 +232,7 @@ public class ServicesManager implements ServicesManagerInterface {
 
                 runningServices.put(jobId, service);
                 serviceNameToJobId.put(sd.getServiceName(), jobId);
+                removeIfAlreadyTerminal(jobId);
 
                 logger.info("Service {} scheduled as {}", sd.getServiceName(), jobId);
             }
@@ -248,7 +245,7 @@ public class ServicesManager implements ServicesManagerInterface {
     }
 
     @Override
-    public void stopAllServices() throws OperationIncompleteException {
+    public synchronized void stopAllServices() throws OperationIncompleteException {
         try {
             for (Map.Entry<String, UUID> e : new ArrayList<>(serviceNameToJobId.entrySet())) {
                 UUID jobId = e.getValue();
@@ -286,11 +283,19 @@ public class ServicesManager implements ServicesManagerInterface {
 
         @Override
         public void run(CancellationToken token) throws Exception {
+            String originalName = Thread.currentThread().getName();
             try {
                 Thread.currentThread().setName("service-" + safeName());
             } catch (Throwable ignore) {
             }
-            service.run();
+            try {
+                service.run();
+            } finally {
+                try {
+                    Thread.currentThread().setName(originalName);
+                } catch (Throwable ignore) {
+                }
+            }
         }
 
         @Override

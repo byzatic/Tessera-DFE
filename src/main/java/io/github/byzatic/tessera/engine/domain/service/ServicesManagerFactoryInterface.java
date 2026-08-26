@@ -9,7 +9,5 @@ import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
 // TODO: java: Unexpected @FunctionalInterface annotation
 //@FunctionalInterface
 public interface ServicesManagerFactoryInterface {
-    ServicesManagerInterface create(JobEventListener... listeners);
-
     ServicesManagerInterface create(ImmediateSchedulerInterface scheduler, JobEventListener... listeners);
 }
