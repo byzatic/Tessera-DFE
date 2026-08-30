@@ -11,6 +11,9 @@ logs
 reports
 data
 flight_recording
+configurations
+src/test
+integration-tests.sh
 
 *.class
 *.iml
@@ -20,7 +23,3 @@ flight_recording
 
 docker-compose*.yml
 docker.*.sh
-
-configurations
-src/test
-integration-tests.sh
