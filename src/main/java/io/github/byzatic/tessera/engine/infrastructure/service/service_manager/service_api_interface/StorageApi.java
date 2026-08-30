@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.service_api_interface;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.domain.model.DataLookupIdentifierImpl;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
@@ -34,7 +33,9 @@ public class StorageApi implements StorageApiInterface {
         try {
             String namingTag = "#NAMED";
             String downstreamNodeId = storageItem.getDownstreamName();
-            ObjectsUtils.requireNonNull(downstreamNodeId, new IllegalArgumentException("Downstream node name should be NotNull"));
+            if (downstreamNodeId == null) {
+                throw new IllegalArgumentException("Downstream node name should be NotNull");
+            }
             logger.debug("Searching downstream GraphNodeRef by node ID {}", downstreamNodeId);
             GraphNodeRef localRequestNode = null;
             NodeItem nodeItem = fullProjectRepository.getNode(graphNodeRef);
@@ -55,7 +56,9 @@ public class StorageApi implements StorageApiInterface {
                 }
             }
             logger.debug("Searching downstream GraphNodeRef by node ID {} complete; result is {}", downstreamNodeId, localRequestNode);
-            ObjectsUtils.requireNonNull(localRequestNode, new MCg3ApiOperationIncompleteException("Node with name " + storageItem.getDownstreamName() + " was not found"));
+            if (localRequestNode == null) {
+                throw new MCg3ApiOperationIncompleteException("Node with name " + storageItem.getDownstreamName() + " was not found");
+            }
             return localRequestNode;
         } catch (Exception e) {
             throw new MCg3ApiOperationIncompleteException(e);
@@ -231,4 +234,3 @@ public class StorageApi implements StorageApiInterface {
     }
 
 }
-

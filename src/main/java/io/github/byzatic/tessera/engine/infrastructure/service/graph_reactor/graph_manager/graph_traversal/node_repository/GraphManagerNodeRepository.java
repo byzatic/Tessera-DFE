@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.node_repository;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.domain.model.node.NodeItem;
@@ -29,10 +28,9 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
     public GraphManagerNodeRepository(@NotNull FullProjectRepository fullProjectRepository) throws OperationIncompleteException {
         try {
             logger.debug("Initialise GraphManagerNodeRepository");
-            ObjectsUtils.requireNonNull(
-                    fullProjectRepository,
-                    new IllegalArgumentException(FullProjectRepository.class.getSimpleName() + " should be NotNull")
-            );
+            if (fullProjectRepository == null) {
+                throw new IllegalArgumentException(FullProjectRepository.class.getSimpleName() + " should be NotNull");
+            }
 
             List<GraphNodeRef> graphNodeRefs = fullProjectRepository.listGraphNodeRef();
             logger.debug("List of all GraphNodeRef size is {}", graphNodeRefs.size());
@@ -65,7 +63,9 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
 
     public GraphManagerNodeRepository(@NotNull Map<GraphNodeRef, Node> nodeRefNodeMap) throws OperationIncompleteException {
         try {
-            ObjectsUtils.requireNonNull(nodeRefNodeMap, new IllegalArgumentException("Map<GraphNodeRef, Node> should be NotNull"));
+            if (nodeRefNodeMap == null) {
+                throw new IllegalArgumentException("Map<GraphNodeRef, Node> should be NotNull");
+            }
             this.nodeRefNodeMap = nodeRefNodeMap;
 
             createRootNodeListV2();
@@ -79,7 +79,9 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
     @Override
     public synchronized Node getNode(@NotNull GraphNodeRef graphNodeRef) throws OperationIncompleteException {
         logger.debug("Request get Node by {}", graphNodeRef);
-        ObjectsUtils.requireNonNull(graphNodeRef, new IllegalArgumentException(GraphNodeRef.class.getSimpleName() + " should be NotNull"));
+        if (graphNodeRef == null) {
+            throw new IllegalArgumentException(GraphNodeRef.class.getSimpleName() + " should be NotNull");
+        }
 
         Node node = nodeRefNodeMap.get(graphNodeRef);
         if (node == null) {
@@ -110,7 +112,9 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
     @Override
     public synchronized List<Node> getNodeDownstream(@NotNull Node node) throws OperationIncompleteException {
         // NOTE: avoid containsValue(node) - it's O(n) and kills CPU on large graphs.
-        ObjectsUtils.requireNonNull(node, new IllegalArgumentException(Node.class.getSimpleName() + " should be NotNull"));
+        if (node == null) {
+            throw new IllegalArgumentException(Node.class.getSimpleName() + " should be NotNull");
+        }
 
         GraphNodeRef ref = node.getGraphNodeRef();
         List<Node> cached = downstreamCache.get(ref);
@@ -131,7 +135,9 @@ public class GraphManagerNodeRepository implements GraphManagerNodeRepositoryInt
     @Override
     public synchronized List<Node> getNodeDownstream(@NotNull GraphNodeRef graphNodeRef) throws OperationIncompleteException {
         logger.debug("Request get List downstream for jpa_like_node_repository by GraphNodeRef {}", graphNodeRef);
-        ObjectsUtils.requireNonNull(graphNodeRef, new IllegalArgumentException(GraphNodeRef.class.getSimpleName() + " should be NotNull"));
+        if (graphNodeRef == null) {
+            throw new IllegalArgumentException(GraphNodeRef.class.getSimpleName() + " should be NotNull");
+        }
 
         if (!nodeRefNodeMap.containsKey(graphNodeRef)) {
             throw new OperationIncompleteException("No such Node was found by " + graphNodeRef);

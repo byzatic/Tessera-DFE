@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.commons.schedulers.immediate.*;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
@@ -49,12 +48,15 @@ public class GraphManager implements GraphManagerInterface {
                         @NotNull ImmediateSchedulerInterface scheduler,
                         JobEventListener... listeners) {
         Objects.requireNonNull(storageManager, "storageManager");
-        ObjectsUtils.requireNonNull(graphManagerNodeRepository,
-                new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
-        ObjectsUtils.requireNonNull(pipelineManagerFactory,
-                new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull"));
-        ObjectsUtils.requireNonNull(scheduler,
-                new IllegalArgumentException(ImmediateSchedulerInterface.class.getSimpleName() + " should be NotNull"));
+        if (graphManagerNodeRepository == null) {
+            throw new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull");
+        }
+        if (pipelineManagerFactory == null) {
+            throw new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull");
+        }
+        if (scheduler == null) {
+            throw new IllegalArgumentException(ImmediateSchedulerInterface.class.getSimpleName() + " should be NotNull");
+        }
 
         this.graphManagerNodeRepository = graphManagerNodeRepository;
         this.pipelineManagerFactory = pipelineManagerFactory;

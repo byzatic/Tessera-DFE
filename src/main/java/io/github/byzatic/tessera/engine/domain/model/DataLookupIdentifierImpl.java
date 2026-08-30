@@ -1,7 +1,5 @@
 package io.github.byzatic.tessera.engine.domain.model;
 
-import io.github.byzatic.commons.ObjectsUtils;
-
 import java.util.Objects;
 
 public class DataLookupIdentifierImpl {
@@ -11,7 +9,9 @@ public class DataLookupIdentifierImpl {
     }
 
     private DataLookupIdentifierImpl(Builder builder) {
-        ObjectsUtils.requireNonNull(builder.dataId, new IllegalArgumentException("dataId should be not null"));
+        if (builder.dataId == null) {
+            throw new IllegalArgumentException("dataId should be not null");
+        }
         dataLookupIdentifier = builder.dataId;
     }
 
