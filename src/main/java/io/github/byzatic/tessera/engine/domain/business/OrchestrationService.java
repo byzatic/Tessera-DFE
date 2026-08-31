@@ -108,6 +108,12 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         // ---- 1) Listener’ы на ImmediateScheduler (ошибки сервисов и любых immediate-задач) ----
         immediateListenerRef = new JobEventListener() {
             private void fail(UUID jobId, String reason, Throwable error) {
+                if (stopping.get()) {
+                    logger.debug("Ignoring ImmediateScheduler terminal event during shutdown: {} (jobId={})",
+                            reason, jobId);
+                    return;
+                }
+
                 // Пытаемся извлечь lastError для детализации
                 Throwable toStore = error;
                 try {
@@ -266,6 +272,9 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         // Разблокируем start() (если ещё не разблокирован фаталом)
         waitUntilStopOrFatal.countDown();
 
+        // Listener'ы больше не должны превращать ожидаемые события shutdown в fatal.
+        removeSchedulerListeners();
+
         GraphManagerInterface currentGraphManager = graphManager;
         if (currentGraphManager != null) {
             try {
@@ -293,22 +302,6 @@ public final class OrchestrationService implements OrchestrationServiceInterface
         } catch (Throwable ignored) {
         }
 
-        // Снимаем listener’ы
-        try {
-            if (cronListenerRef != null) {
-                cronScheduler.removeListener(cronListenerRef);
-                cronListenerRef = null;
-            }
-        } catch (Throwable ignored) {
-        }
-        try {
-            if (immediateListenerRef != null) {
-                immediateScheduler.removeListener(immediateListenerRef);
-                immediateListenerRef = null;
-            }
-        } catch (Throwable ignored) {
-        }
-
         // Останавливаем сервисы
         try {
             if (serviceManager != null) {
@@ -329,6 +322,23 @@ public final class OrchestrationService implements OrchestrationServiceInterface
 
         state = ServiceState.STOPPED;
         logger.info("OrchestrationService is STOPPED.");
+    }
+
+    private void removeSchedulerListeners() {
+        try {
+            if (cronListenerRef != null) {
+                cronScheduler.removeListener(cronListenerRef);
+                cronListenerRef = null;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (immediateListenerRef != null) {
+                immediateScheduler.removeListener(immediateListenerRef);
+                immediateListenerRef = null;
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     @Override
