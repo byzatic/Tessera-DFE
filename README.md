@@ -70,6 +70,29 @@ Parameter resolution order:
 Environment variables or JVM options override values from the configuration file.  
 If a parameter is not defined in any layer and has no default value, the engine will fail to start.
 
+### Shared execution runtime
+
+Tessera creates one process-scoped `ThreadPoolExecutor`. Lifecycle coordination, configuration
+polling, project runtimes, services, graph routines, and cron jobs all execute through the same
+`UnifiedScheduler`. Project reload commands use a logical serial lane, so they remain FIFO and
+non-overlapping without allocating a dedicated executor.
+
+The worker pool uses direct handoff and explicit rejection at its configured maximum. Its JVM
+options are:
+
+| Java VM option | Default |
+|---|---|
+| `-DexecutionCoreThreads=<positive integer>` | `max(4, available processors)` |
+| `-DexecutionThreadsPerProcessor=<positive integer>` | `8` |
+| `-DexecutionMaximumThreads=<positive integer>` | `max(core threads, min(256, max(32, available processors * threads per processor)))` |
+
+`executionMaximumThreads` is an absolute override. Without it, the scaler keeps a minimum of 32
+workers for mixed service and workflow workloads, grows with available processors, and caps the
+automatic value at 256. An explicitly configured core size remains the lower bound.
+
+The scheduler owns graceful process shutdown; project-scoped compatibility facades cancel only
+their own jobs and never close the shared executor.
+
 
 
 ### Parameter: configFilePath

@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.storageapi.storageapi.StorageApiInterface;
 import io.github.byzatic.tessera.workflowroutine.api_engine.MCg3WorkflowRoutineApiInterface;
 import io.github.byzatic.tessera.workflowroutine.configuration.ConfigurationParameter;
@@ -19,18 +18,18 @@ public class MCg3WorkflowRoutineApi implements MCg3WorkflowRoutineApiInterface {
     }
 
     private MCg3WorkflowRoutineApi(Builder builder) {
-        ObjectsUtils.requireNonNull(
-                builder.storageApi,
-                new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + StorageApiInterface.class.getSimpleName())
-        );
-        ObjectsUtils.requireNonNull(
-                builder.workflowRoutineConfigurationParameters,
-                new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null list of " + ConfigurationParameter.class.getSimpleName())
-        );
-        ObjectsUtils.requireNonNull(
-                builder.executionContext,
-                new IllegalArgumentException("Can't create " + this.getClass().getSimpleName() + " with null " + ExecutionContextInterface.class.getSimpleName())
-        );
+        if (builder.storageApi == null) {
+            throw new IllegalArgumentException("Can't create " + getClass().getSimpleName()
+                    + " with null " + StorageApiInterface.class.getSimpleName());
+        }
+        if (builder.workflowRoutineConfigurationParameters == null) {
+            throw new IllegalArgumentException("Can't create " + getClass().getSimpleName()
+                    + " with null list of " + ConfigurationParameter.class.getSimpleName());
+        }
+        if (builder.executionContext == null) {
+            throw new IllegalArgumentException("Can't create " + getClass().getSimpleName()
+                    + " with null " + ExecutionContextInterface.class.getSimpleName());
+        }
         storageApi = builder.storageApi;
         workflowRoutineConfigurationParameters = builder.workflowRoutineConfigurationParameters;
         executionContext = builder.executionContext;

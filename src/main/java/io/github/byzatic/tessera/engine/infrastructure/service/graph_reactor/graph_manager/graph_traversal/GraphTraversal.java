@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
@@ -55,8 +54,12 @@ public class GraphTraversal implements GraphTraversalInterface {
 
     public GraphTraversal(@NotNull GraphManagerNodeRepositoryInterface graphManagerNodeRepository,
                           PipelineManagerFactoryInterface pipelineManagerFactory) {
-        ObjectsUtils.requireNonNull(graphManagerNodeRepository, new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
-        ObjectsUtils.requireNonNull(pipelineManagerFactory, new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull"));
+        if (graphManagerNodeRepository == null) {
+            throw new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull");
+        }
+        if (pipelineManagerFactory == null) {
+            throw new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull");
+        }
         this.graphManagerNodeRepository = graphManagerNodeRepository;
         this.pipelineManagerFactory = pipelineManagerFactory;
     }
@@ -65,8 +68,12 @@ public class GraphTraversal implements GraphTraversalInterface {
                           PipelineManagerFactoryInterface pipelineManagerFactory,
                           ImmediateSchedulerInterface immediateScheduler,
                           JobEventListener... listeners) {
-        ObjectsUtils.requireNonNull(graphManagerNodeRepository, new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull"));
-        ObjectsUtils.requireNonNull(pipelineManagerFactory, new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull"));
+        if (graphManagerNodeRepository == null) {
+            throw new IllegalArgumentException(GraphManagerNodeRepositoryInterface.class.getSimpleName() + " should be NotNull");
+        }
+        if (pipelineManagerFactory == null) {
+            throw new IllegalArgumentException(PipelineManagerFactoryInterface.class.getSimpleName() + " should be NotNull");
+        }
         this.graphManagerNodeRepository = graphManagerNodeRepository;
         this.pipelineManagerFactory = pipelineManagerFactory;
         this.immediateScheduler = immediateScheduler;
@@ -76,7 +83,9 @@ public class GraphTraversal implements GraphTraversalInterface {
     @Override
     public void traverse(@NotNull Node root) throws OperationIncompleteException {
         try {
-            ObjectsUtils.requireNonNull(root, new IllegalArgumentException(Node.class.getSimpleName() + " should be NotNull"));
+            if (root == null) {
+                throw new IllegalArgumentException(Node.class.getSimpleName() + " should be NotNull");
+            }
             Deque<NodePathState> stack = new ArrayDeque<>();
             stack.push(new NodePathState(root, new ArrayList<>()));
             logger.debug("root node pushed to stack");

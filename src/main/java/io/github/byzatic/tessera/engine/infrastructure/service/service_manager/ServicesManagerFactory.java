@@ -32,17 +32,6 @@ public final class ServicesManagerFactory implements ServicesManagerFactoryInter
     }
 
     @Override
-    public ServicesManagerInterface create(JobEventListener... listeners) {
-        // Используем конструктор ServicesManager с листнерами
-        return new ServicesManager(
-                fullProjectRepository,
-                serviceFactory,
-                storageManager,
-                listeners
-        );
-    }
-
-    @Override
     public ServicesManagerInterface create(@NotNull ImmediateSchedulerInterface scheduler,
                                            JobEventListener... listeners) {
         Objects.requireNonNull(scheduler, "scheduler");

@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.dto;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.domain.model.GraphNodeRef;
 import io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal.NodeLifecycleState;
 
@@ -18,8 +17,12 @@ public class Node {
     }
 
     private Node(Builder builder) {
-        ObjectsUtils.requireNonNull(builder.graphNodeRef, new IllegalArgumentException("graphNodeRef should be NotNull"));
-        ObjectsUtils.requireNonNull(builder.downstream, new IllegalArgumentException("downstream should be NotNull"));
+        if (builder.graphNodeRef == null) {
+            throw new IllegalArgumentException("graphNodeRef should be NotNull");
+        }
+        if (builder.downstream == null) {
+            throw new IllegalArgumentException("downstream should be NotNull");
+        }
         graphNodeRef = builder.graphNodeRef;
 
         setNodeLifecycleState(builder.nodeLifecycleState);

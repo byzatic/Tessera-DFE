@@ -26,7 +26,7 @@ RUN --mount=type=cache,id=tessera-dfe-maven,target=/root/.m2/repository,sharing=
     if [ "$build_status" -ne 0 ]; then exit "$build_status"; fi; \
     exit "$purge_status"
 
-FROM --platform=linux/amd64 docker.io/eclipse-temurin:17-jre-jammy
+FROM --platform=linux/amd64 docker.io/eclipse-temurin:17-jdk-jammy
 
 ARG LOCAL_BUILD_NONCE
 RUN test -n "${LOCAL_BUILD_NONCE}"

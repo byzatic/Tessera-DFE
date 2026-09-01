@@ -2,6 +2,7 @@ package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionHandle;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRuntimeSession;
+import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntime;
 import io.github.byzatic.tessera.engine.application.runtime.ProjectRuntimeFactory;
@@ -32,6 +33,12 @@ import java.util.Objects;
  * Builds a complete per-revision dependency graph without static project singletons.
  */
 public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory {
+
+    private final ApplicationExecutionRuntime executionRuntime;
+
+    public DefaultProjectRuntimeFactory(ApplicationExecutionRuntime executionRuntime) {
+        this.executionRuntime = Objects.requireNonNull(executionRuntime, "executionRuntime");
+    }
 
     @Override
     public ProjectRuntime create(ProjectRevisionHandle revision)
@@ -205,7 +212,14 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
             ServicesManagerFactory servicesManagerFactory,
             GraphManagerFactory graphManagerFactory
     ) {
-        return new OrchestrationService(servicesManagerFactory, graphManagerFactory);
+        return new OrchestrationService(
+                servicesManagerFactory,
+                graphManagerFactory,
+                executionRuntime.immediateScheduler(),
+                executionRuntime.cronScheduler(Configuration.PROJECT_SHUTDOWN_TIMEOUT),
+                Configuration.PROJECT_SHUTDOWN_TIMEOUT,
+                Configuration.CRON_EXPRESSION_STRING
+        );
     }
 
     /**
@@ -224,7 +238,8 @@ public final class DefaultProjectRuntimeFactory implements ProjectRuntimeFactory
         return new DefaultProjectRuntime(
                 revisionId,
                 orchestrationService,
-                storageManager
+                storageManager,
+                executionRuntime.scheduler()
         );
     }
 

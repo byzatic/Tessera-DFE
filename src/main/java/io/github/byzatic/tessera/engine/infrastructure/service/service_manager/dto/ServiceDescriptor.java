@@ -1,7 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.dto;
 
-import io.github.byzatic.commons.ObjectsUtils;
-
 import java.util.List;
 import java.util.Objects;
 
@@ -13,8 +11,12 @@ public class ServiceDescriptor {
     }
 
     private ServiceDescriptor(Builder builder) {
-        ObjectsUtils.requireNonNull(builder.serviceName, new IllegalArgumentException("serviceName in " + this.getClass().getSimpleName() + " require NonNull"));
-        ObjectsUtils.requireNonNull(builder.serviceParameterList, new IllegalArgumentException("serviceParameterList in " + this.getClass().getSimpleName() + " require NonNull"));
+        if (builder.serviceName == null) {
+            throw new IllegalArgumentException("serviceName in " + getClass().getSimpleName() + " require NonNull");
+        }
+        if (builder.serviceParameterList == null) {
+            throw new IllegalArgumentException("serviceParameterList in " + getClass().getSimpleName() + " require NonNull");
+        }
         serviceName = builder.serviceName;
         serviceParameterList = List.copyOf(builder.serviceParameterList);
     }

@@ -1,5 +1,9 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
+import io.github.byzatic.commons.schedulers.unified.ExecutionLane;
+import io.github.byzatic.commons.schedulers.unified.RunHandle;
+import io.github.byzatic.commons.schedulers.unified.UnifiedScheduler;
+import io.github.byzatic.commons.schedulers.unified.UnifiedSchedulerInterface;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionError;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionHandle;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionListener;
@@ -16,18 +20,15 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Serializes project revision changes and replaces complete project runtimes atomically.
  *
- * <p>All mutable runtime state is confined to a single executor thread. External callbacks
- * only enqueue commands and never mutate the active runtime directly.</p>
+ * <p>All mutable runtime state is confined to one logical serial execution lane. The physical
+ * worker may change while the lane is idle, but commands never overlap and publication is ordered
+ * by the lane. External callbacks only enqueue commands and never mutate active state directly.</p>
  */
 public final class ProjectReloadCoordinator
         implements ProjectRevisionListener, AutoCloseable {
@@ -41,7 +42,9 @@ public final class ProjectReloadCoordinator
     private final Duration initialRevisionTimeout;
     private final Duration startupTimeout;
     private final Duration shutdownTimeout;
-    private final ScheduledExecutorService reloadExecutor;
+    private final UnifiedSchedulerInterface scheduler;
+    private final ExecutionLane reloadLane;
+    private final boolean ownsScheduler;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean revisionDrainScheduled = new AtomicBoolean(false);
@@ -54,6 +57,7 @@ public final class ProjectReloadCoordinator
             new RuntimeFailureListener();
 
     private volatile ProjectRevisionSubscription revisionSubscription;
+    private volatile RunHandle initialRevisionTimeoutRun;
     private ProjectRuntime activeRuntime;
     private ProjectRevisionHandle activeRevision;
     private boolean initialRevisionActivated;
@@ -66,6 +70,51 @@ public final class ProjectReloadCoordinator
             Duration startupTimeout,
             Duration shutdownTimeout
     ) {
+        this(
+                projectIO,
+                watchRequest,
+                runtimeFactory,
+                initialRevisionTimeout,
+                startupTimeout,
+                shutdownTimeout,
+                UnifiedScheduler.builder()
+                        .threadNamePrefix("project-reload-worker")
+                        .build(),
+                true
+        );
+    }
+
+    public ProjectReloadCoordinator(
+            TesseraProjectIO projectIO,
+            ProjectRevisionWatchRequest watchRequest,
+            ProjectRuntimeFactory runtimeFactory,
+            Duration initialRevisionTimeout,
+            Duration startupTimeout,
+            Duration shutdownTimeout,
+            UnifiedSchedulerInterface scheduler
+    ) {
+        this(
+                projectIO,
+                watchRequest,
+                runtimeFactory,
+                initialRevisionTimeout,
+                startupTimeout,
+                shutdownTimeout,
+                scheduler,
+                false
+        );
+    }
+
+    private ProjectReloadCoordinator(
+            TesseraProjectIO projectIO,
+            ProjectRevisionWatchRequest watchRequest,
+            ProjectRuntimeFactory runtimeFactory,
+            Duration initialRevisionTimeout,
+            Duration startupTimeout,
+            Duration shutdownTimeout,
+            UnifiedSchedulerInterface scheduler,
+            boolean ownsScheduler
+    ) {
         this.projectIO = Objects.requireNonNull(projectIO, "projectIO");
         this.watchRequest = Objects.requireNonNull(watchRequest, "watchRequest");
         this.runtimeFactory = Objects.requireNonNull(runtimeFactory, "runtimeFactory");
@@ -75,13 +124,9 @@ public final class ProjectReloadCoordinator
         );
         this.startupTimeout = Objects.requireNonNull(startupTimeout, "startupTimeout");
         this.shutdownTimeout = Objects.requireNonNull(shutdownTimeout, "shutdownTimeout");
-        ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-                1,
-                new ReloadThreadFactory()
-        );
-        executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-        executor.setRemoveOnCancelPolicy(true);
-        this.reloadExecutor = executor;
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.reloadLane = scheduler.serialLane("project-reload");
+        this.ownsScheduler = ownsScheduler;
     }
 
     /**
@@ -135,7 +180,7 @@ public final class ProjectReloadCoordinator
             return;
         }
         try {
-            reloadExecutor.execute(new RevisionDrainCommand());
+            reloadLane.submit(new RevisionDrainCommand());
         } catch (RejectedExecutionException exception) {
             revisionDrainScheduled.set(false);
             ProjectRevisionHandle rejected = pendingRevision.getAndSet(null);
@@ -150,7 +195,7 @@ public final class ProjectReloadCoordinator
             return;
         }
         try {
-            reloadExecutor.execute(new RevisionRejectedCommand(failure));
+            reloadLane.submit(new RevisionRejectedCommand(failure));
         } catch (RejectedExecutionException exception) {
             if (!closed.get()) {
                 failure.getCause().addSuppressed(exception);
@@ -161,10 +206,9 @@ public final class ProjectReloadCoordinator
 
     private void scheduleInitialRevisionTimeout() {
         try {
-            reloadExecutor.schedule(
-                    new InitialRevisionTimeoutCommand(),
-                    initialRevisionTimeout.toMillis(),
-                    TimeUnit.MILLISECONDS
+            initialRevisionTimeoutRun = scheduler.schedule(
+                    cancellation -> reloadLane.submit(new InitialRevisionTimeoutCommand()),
+                    initialRevisionTimeout
             );
         } catch (RejectedExecutionException exception) {
             if (!closed.get() && terminalFailure.get() == null) {
@@ -180,21 +224,26 @@ public final class ProjectReloadCoordinator
         }
 
         closeRevisionSubscription();
-        reloadExecutor.shutdown();
+        RunHandle timeoutRun = initialRevisionTimeoutRun;
+        if (timeoutRun != null) {
+            timeoutRun.requestCancellation("Project reload coordinator closing");
+        }
+        reloadLane.shutdown();
         try {
-            if (!reloadExecutor.awaitTermination(
-                    shutdownTimeout.toMillis(),
-                    TimeUnit.MILLISECONDS)) {
-                reloadExecutor.shutdownNow();
+            if (!reloadLane.awaitTermination(shutdownTimeout)) {
+                reloadLane.shutdownNow();
             }
         } catch (InterruptedException exception) {
-            reloadExecutor.shutdownNow();
+            reloadLane.shutdownNow();
             Thread.currentThread().interrupt();
         }
 
         stopAndCloseActiveRuntime();
         closeRevision(pendingRevision.getAndSet(null), null);
         terminated.countDown();
+        if (ownsScheduler) {
+            scheduler.close();
+        }
     }
 
     private void activate(ProjectRevisionHandle revision) {
@@ -253,7 +302,7 @@ public final class ProjectReloadCoordinator
             return;
         }
         try {
-            reloadExecutor.execute(new RuntimeFailureCommand(runtime, failure));
+            reloadLane.submit(new RuntimeFailureCommand(runtime, failure));
         } catch (RejectedExecutionException exception) {
             failure.addSuppressed(exception);
             terminalFailure.compareAndSet(null, failure);
@@ -456,14 +505,20 @@ public final class ProjectReloadCoordinator
 
         @Override
         public void run() {
-            logger.error(
+            if (!initialRevisionActivated) {
+                logger.error(
+                        "Initial project archive revision {} was rejected",
+                        failure.getRevisionId(),
+                        failure.getCause()
+                );
+                terminateWithFailure(failure.getCause());
+                return;
+            }
+            logger.warn(
                     "Project archive revision {} was rejected",
                     failure.getRevisionId(),
                     failure.getCause()
             );
-            if (!initialRevisionActivated) {
-                terminateWithFailure(failure.getCause());
-            }
         }
     }
 
@@ -481,12 +536,4 @@ public final class ProjectReloadCoordinator
         }
     }
 
-    private static final class ReloadThreadFactory implements ThreadFactory {
-        @Override
-        public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(runnable, "project-reload-coordinator");
-            thread.setDaemon(false);
-            return thread;
-        }
-    }
 }

@@ -1,7 +1,6 @@
 package io.github.byzatic.tessera.engine.infrastructure.runtime;
 
 import io.github.byzatic.commons.schedulers.immediate.CancellationToken;
-import io.github.byzatic.commons.schedulers.immediate.ImmediateScheduler;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.Task;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionWatchRequest;
@@ -70,22 +69,23 @@ public final class TesseraEngineLifecycleManager implements AutoCloseable {
      *
      * @return lifecycle manager configured from {@link Configuration}
      */
-    public static TesseraEngineLifecycleManager createDefault() {
+    public static TesseraEngineLifecycleManager createDefault(
+            ApplicationExecutionRuntime executionRuntime
+    ) {
+        Objects.requireNonNull(executionRuntime, "executionRuntime");
         TesseraProjectIO projectIO = DefaultTesseraProjectIO.createDefault();
         ProjectRevisionWatchRequest watchRequest = createRevisionWatchRequest();
-        ProjectRuntimeFactory runtimeFactory = new DefaultProjectRuntimeFactory();
+        ProjectRuntimeFactory runtimeFactory = new DefaultProjectRuntimeFactory(executionRuntime);
         ProjectReloadCoordinator reloadCoordinator = new ProjectReloadCoordinator(
                 projectIO,
                 watchRequest,
                 runtimeFactory,
                 Configuration.PROJECT_INITIAL_REVISION_TIMEOUT,
                 Configuration.PROJECT_STARTUP_TIMEOUT,
-                Configuration.PROJECT_SHUTDOWN_TIMEOUT
+                Configuration.PROJECT_SHUTDOWN_TIMEOUT,
+                executionRuntime.scheduler()
         );
-        ImmediateSchedulerInterface lifecycleScheduler =
-                new ImmediateScheduler.Builder()
-                        .defaultGrace(Configuration.PROJECT_SHUTDOWN_TIMEOUT)
-                        .build();
+        ImmediateSchedulerInterface lifecycleScheduler = executionRuntime.immediateScheduler();
         return new TesseraEngineLifecycleManager(
                 reloadCoordinator,
                 PrometheusMetricsAgent.getInstance(),

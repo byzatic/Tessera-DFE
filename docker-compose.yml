@@ -14,7 +14,8 @@ services:
       - GRAPH_CALCULATION_CRON_CYCLE=*/30 * * * * *
       - PROMETHEUS_URI=http://0.0.0.0:9090/metrics
       - XMS=512m
-      - XMX=6144m
+      - XMX=3072m
+    mem_limit: 4g
     logging:
       driver: json-file
       options:
@@ -27,6 +28,5 @@ networks:
   93849dcd429a-tessera-dfe:
     name: 93849dcd429a-tessera-dfe
     external: false
-
 
 

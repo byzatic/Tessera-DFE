@@ -1,7 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.service_manager.dto;
 
-import io.github.byzatic.commons.ObjectsUtils;
-
 import java.util.Objects;
 
 public class ServiceParameter {
@@ -12,8 +10,12 @@ public class ServiceParameter {
     }
 
     private ServiceParameter(Builder builder) {
-        ObjectsUtils.requireNonNull(builder.parameterKey, new IllegalArgumentException("parameterKey in " + this.getClass().getSimpleName() + " require NonNull"));
-        ObjectsUtils.requireNonNull(builder.parameterValue, new IllegalArgumentException("parameterValue in " + this.getClass().getSimpleName() + " require NonNull"));
+        if (builder.parameterKey == null) {
+            throw new IllegalArgumentException("parameterKey in " + getClass().getSimpleName() + " require NonNull");
+        }
+        if (builder.parameterValue == null) {
+            throw new IllegalArgumentException("parameterValue in " + getClass().getSimpleName() + " require NonNull");
+        }
         parameterKey = builder.parameterKey;
         parameterValue = builder.parameterValue;
     }

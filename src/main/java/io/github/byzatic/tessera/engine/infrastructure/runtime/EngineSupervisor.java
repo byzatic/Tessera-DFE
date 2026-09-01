@@ -25,6 +25,7 @@ public final class EngineSupervisor
     private static final Logger logger = LoggerFactory.getLogger(EngineSupervisor.class);
     private static final long DEFAULT_WATCH_INTERVAL_MILLIS = 1000L;
 
+    private final ApplicationExecutionRuntime executionRuntime;
     private final PollingConfigurationFileWatcher configurationWatcher;
     private final AtomicReference<TesseraEngineLifecycleManager> activeLifecycle =
             new AtomicReference<TesseraEngineLifecycleManager>();
@@ -32,6 +33,7 @@ public final class EngineSupervisor
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     private EngineSupervisor(Duration watchInterval) {
+        this.executionRuntime = ApplicationExecutionRuntime.createDefault();
         this.configurationWatcher = createConfigurationWatcher(watchInterval);
     }
 
@@ -89,10 +91,14 @@ public final class EngineSupervisor
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        configurationWatcher.close();
-        TesseraEngineLifecycleManager lifecycle = activeLifecycle.get();
-        if (lifecycle != null) {
-            lifecycle.close();
+        try {
+            configurationWatcher.close();
+            TesseraEngineLifecycleManager lifecycle = activeLifecycle.get();
+            if (lifecycle != null) {
+                lifecycle.close();
+            }
+        } finally {
+            executionRuntime.close();
         }
     }
 
@@ -102,7 +108,7 @@ public final class EngineSupervisor
      * @return new engine lifecycle
      */
     private TesseraEngineLifecycleManager createLifecycleManager() {
-        return TesseraEngineLifecycleManager.createDefault();
+        return TesseraEngineLifecycleManager.createDefault(executionRuntime);
     }
 
     /**
@@ -118,7 +124,8 @@ public final class EngineSupervisor
                 Configuration.CONFIGURATION_FILE_PATH,
                 watchInterval,
                 this,
-                new XmlConfigurationCandidateValidator()
+                new XmlConfigurationCandidateValidator(),
+                executionRuntime.scheduler()
         );
     }
 

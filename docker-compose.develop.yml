@@ -21,7 +21,7 @@ services:
       - PUBLISH_NODE_PIPELINE_EXECUTION_TIME=False
       - PUBLISH_STORAGE_ANALYTICS=False
       - XMS=512m
-      - XMX=6144m
+      - XMX=3072m
       # Production Flight Recording
       #- JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=name=tessera,filename=/tmp/flight_recording/recording.jfr,settings=profile,dumponexit=true,maxsize=512m,maxage=1h,delay=348s
       # Develop Flight Recording
@@ -30,6 +30,7 @@ services:
       #- PROJECT_INITIAL_REVISION_TIMEOUT_SECONDS=60
       #- PROJECT_STARTUP_TIMEOUT_SECONDS=60
       #- PROJECT_SHUTDOWN_TIMEOUT_SECONDS=180
+    mem_limit: 4g
     logging:
       driver: json-file
       options:

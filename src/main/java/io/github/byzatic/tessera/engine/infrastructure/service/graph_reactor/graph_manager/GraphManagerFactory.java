@@ -32,17 +32,6 @@ public final class GraphManagerFactory implements GraphManagerFactoryInterface {
     }
 
     @Override
-    public GraphManagerInterface create(JobEventListener... listeners) {
-        // Используем конструктор GraphManager, создающий собственный ImmediateScheduler
-        return new GraphManager(
-                storageManager,
-                graphManagerNodeRepository,
-                pipelineManagerFactory,
-                listeners
-        );
-    }
-
-    @Override
     public GraphManagerInterface create(@NotNull ImmediateSchedulerInterface scheduler, JobEventListener... listeners) {
         Objects.requireNonNull(scheduler, "scheduler");
         // Используем конструктор GraphManager с внешним шедуллером и листнерами

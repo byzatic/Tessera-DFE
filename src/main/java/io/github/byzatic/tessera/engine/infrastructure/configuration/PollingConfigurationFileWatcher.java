@@ -1,5 +1,12 @@
 package io.github.byzatic.tessera.engine.infrastructure.configuration;
 
+import io.github.byzatic.commons.schedulers.unified.FailurePolicy;
+import io.github.byzatic.commons.schedulers.unified.OverlapPolicy;
+import io.github.byzatic.commons.schedulers.unified.ScheduleHandle;
+import io.github.byzatic.commons.schedulers.unified.ScheduleOptions;
+import io.github.byzatic.commons.schedulers.unified.Schedules;
+import io.github.byzatic.commons.schedulers.unified.UnifiedScheduler;
+import io.github.byzatic.commons.schedulers.unified.UnifiedSchedulerInterface;
 import io.github.byzatic.tessera.engine.application.runtime.ConfigurationCandidateValidator;
 import io.github.byzatic.tessera.engine.application.runtime.ConfigurationChangeListener;
 import org.slf4j.Logger;
@@ -12,16 +19,13 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Polls the engine configuration file and reports stable, valid replacements.
  *
- * <p>The watcher is thread-safe. Observation state is confined to its single executor thread.
+ * <p>The watcher is thread-safe. Observation state is confined to its non-overlapping
+ * fixed-delay schedule.
  * A change must have the same file signature in two consecutive observations before it is
  * validated. This prevents partially written files from restarting the engine.</p>
  */
@@ -35,7 +39,8 @@ public final class PollingConfigurationFileWatcher implements AutoCloseable {
     private final Duration pollInterval;
     private final ConfigurationChangeListener listener;
     private final ConfigurationCandidateValidator validator;
-    private final ScheduledExecutorService executor;
+    private final UnifiedSchedulerInterface scheduler;
+    private final boolean ownsScheduler;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -43,6 +48,7 @@ public final class PollingConfigurationFileWatcher implements AutoCloseable {
     private FileSignature rejectedSignature;
     private FileSignature candidateSignature;
     private int stableObservations;
+    private volatile ScheduleHandle pollingSchedule;
 
     /**
      * Creates a polling watcher for one engine configuration file.
@@ -58,6 +64,36 @@ public final class PollingConfigurationFileWatcher implements AutoCloseable {
             ConfigurationChangeListener listener,
             ConfigurationCandidateValidator validator
     ) {
+        this(
+                configurationFile,
+                pollInterval,
+                listener,
+                validator,
+                UnifiedScheduler.builder()
+                        .threadNamePrefix("configuration-watcher-worker")
+                        .build(),
+                true
+        );
+    }
+
+    public PollingConfigurationFileWatcher(
+            Path configurationFile,
+            Duration pollInterval,
+            ConfigurationChangeListener listener,
+            ConfigurationCandidateValidator validator,
+            UnifiedSchedulerInterface scheduler
+    ) {
+        this(configurationFile, pollInterval, listener, validator, scheduler, false);
+    }
+
+    private PollingConfigurationFileWatcher(
+            Path configurationFile,
+            Duration pollInterval,
+            ConfigurationChangeListener listener,
+            ConfigurationCandidateValidator validator,
+            UnifiedSchedulerInterface scheduler,
+            boolean ownsScheduler
+    ) {
         this.configurationFile = Objects.requireNonNull(
                 configurationFile,
                 "configurationFile"
@@ -65,7 +101,8 @@ public final class PollingConfigurationFileWatcher implements AutoCloseable {
         this.pollInterval = requirePositive(pollInterval);
         this.listener = Objects.requireNonNull(listener, "listener");
         this.validator = Objects.requireNonNull(validator, "validator");
-        this.executor = Executors.newSingleThreadScheduledExecutor(new WatcherThreadFactory());
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.ownsScheduler = ownsScheduler;
     }
 
     /**
@@ -73,7 +110,7 @@ public final class PollingConfigurationFileWatcher implements AutoCloseable {
      *
      * @throws IOException when the initial file state cannot be read
      */
-    public void start() throws IOException {
+    public synchronized void start() throws IOException {
         if (!started.compareAndSet(false, true)) {
             throw new IllegalStateException("Configuration watcher is already started");
         }
@@ -81,20 +118,28 @@ public final class PollingConfigurationFileWatcher implements AutoCloseable {
             throw new IllegalStateException("Configuration watcher is already closed");
         }
         acceptedSignature = readSignature();
-        executor.scheduleWithFixedDelay(
-                new PollCommand(),
-                pollInterval.toMillis(),
-                pollInterval.toMillis(),
-                TimeUnit.MILLISECONDS
+        pollingSchedule = scheduler.schedule(
+                cancellation -> new PollCommand().run(),
+                Schedules.fixedDelay(pollInterval, pollInterval),
+                ScheduleOptions.builder()
+                        .overlapPolicy(OverlapPolicy.SKIP)
+                        .failurePolicy(FailurePolicy.CONTINUE)
+                        .build()
         );
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        executor.shutdownNow();
+        ScheduleHandle schedule = pollingSchedule;
+        if (schedule != null) {
+            schedule.cancel();
+        }
+        if (ownsScheduler) {
+            scheduler.close();
+        }
     }
 
     private void poll() {
@@ -225,13 +270,4 @@ public final class PollingConfigurationFileWatcher implements AutoCloseable {
         }
     }
 
-    private static final class WatcherThreadFactory implements ThreadFactory {
-
-        @Override
-        public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(runnable, "configuration-file-watcher");
-            thread.setDaemon(false);
-            return thread;
-        }
-    }
 }

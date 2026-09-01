@@ -78,17 +78,17 @@ public class StorageDescription implements StorageDescriptionInterface {
 
     @Override
     public String getIdName() {
-        return null;
+        return idName;
     }
 
     @Override
     public String getDescription() {
-        return null;
+        return description;
     }
 
     @Override
     public List<StorageOptionInterface> getOptions() {
-        return null;
+        return options;
     }
 
     @Override

@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.pipeline_manager.api_interface.execution_context;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import io.github.byzatic.tessera.engine.application.commons.exceptions.OperationIncompleteException;
 import io.github.byzatic.tessera.enginecommon.logging.MdcContextInterface;
 import io.github.byzatic.tessera.storageapi.exceptions.MCg3ApiOperationIncompleteException;
@@ -21,11 +20,21 @@ public class ExecutionContext implements ExecutionContextInterface {
     }
 
     private ExecutionContext(Builder builder) {
-        ObjectsUtils.requireNonNull(builder.pipelineDescription, new IllegalArgumentException("pipelineDescription must be not null"));
-        ObjectsUtils.requireNonNull(builder.nodeDescription, new IllegalArgumentException("nodeDescription must be not null"));
-        ObjectsUtils.requireNonNull(builder.globalStoragesDescription, new IllegalArgumentException("globalStoragesDescription must be not null"));
-        ObjectsUtils.requireNonNull(builder.pipelineExecutionInfo, new IllegalArgumentException("pipelineExecutionInfo must be not null"));
-        ObjectsUtils.requireNonNull(builder.mdcContext, new IllegalArgumentException("mdcContext must be not null"));
+        if (builder.pipelineDescription == null) {
+            throw new IllegalArgumentException("pipelineDescription must be not null");
+        }
+        if (builder.nodeDescription == null) {
+            throw new IllegalArgumentException("nodeDescription must be not null");
+        }
+        if (builder.globalStoragesDescription == null) {
+            throw new IllegalArgumentException("globalStoragesDescription must be not null");
+        }
+        if (builder.pipelineExecutionInfo == null) {
+            throw new IllegalArgumentException("pipelineExecutionInfo must be not null");
+        }
+        if (builder.mdcContext == null) {
+            throw new IllegalArgumentException("mdcContext must be not null");
+        }
         pipelineDescription = builder.pipelineDescription;
         nodeDescription = builder.nodeDescription;
         globalStoragesDescription = builder.globalStoragesDescription;

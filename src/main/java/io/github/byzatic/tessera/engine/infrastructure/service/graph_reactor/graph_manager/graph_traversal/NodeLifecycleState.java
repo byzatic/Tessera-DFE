@@ -1,6 +1,5 @@
 package io.github.byzatic.tessera.engine.infrastructure.service.graph_reactor.graph_manager.graph_traversal;
 
-import io.github.byzatic.commons.ObjectsUtils;
 import org.jetbrains.annotations.NotNull;
 
 public enum NodeLifecycleState {
@@ -11,7 +10,7 @@ public enum NodeLifecycleState {
     private int code;
 
     NodeLifecycleState(@NotNull Integer code) {
-        ObjectsUtils.requireNonNull(code, new IllegalArgumentException("Node lifecycle state code should be NotNull"));
+        requireCode(code);
         this.code = code;
     }
 
@@ -20,7 +19,7 @@ public enum NodeLifecycleState {
     }
 
     synchronized public void setCode(@NotNull Integer code) {
-        ObjectsUtils.requireNonNull(code, new IllegalArgumentException("Node lifecycle state code should be NotNull"));
+        requireCode(code);
         this.code = code;
     }
 
@@ -31,13 +30,19 @@ public enum NodeLifecycleState {
      * @return
      */
     synchronized public static NodeLifecycleState fromCode(@NotNull Integer code) {
-        ObjectsUtils.requireNonNull(code, new IllegalArgumentException("Node lifecycle state code should be NotNull"));
+        requireCode(code);
         for (NodeLifecycleState state : values()) {
             if (state.code == code) {
                 return state;
             }
         }
         throw new IllegalArgumentException("Unknown code: " + code);
+    }
+
+    private static void requireCode(Integer code) {
+        if (code == null) {
+            throw new IllegalArgumentException("Node lifecycle state code should be NotNull");
+        }
     }
 
     @Override

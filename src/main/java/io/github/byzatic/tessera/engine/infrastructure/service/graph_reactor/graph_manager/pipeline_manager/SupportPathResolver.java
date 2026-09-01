@@ -4,40 +4,54 @@ import java.nio.file.Path;
 
 public class SupportPathResolver {
 
+    private static final String NODE_PATH_VARIABLE = "${NODE_PATH}";
+    private static final String PROJECT_GLOBAL_PATH_VARIABLE = "${PROJECT_GLOBAL_PATH}";
+
     private final Path nodeFileStoragePath;
     private final Path projectGlobalFileStoragePath;
 
-    public SupportPathResolver(Path nodeFileStoragePath, Path projectGlobalFileStoragePath) {
+    public SupportPathResolver(
+            Path nodeFileStoragePath,
+            Path projectGlobalFileStoragePath
+    ) {
         this.nodeFileStoragePath = nodeFileStoragePath;
         this.projectGlobalFileStoragePath = projectGlobalFileStoragePath;
     }
 
     public String processTemplate(String templateString) {
-        final String nodePathVariable = "${NODE_PATH}";
-        final String projectGlobalVariable = "${PROJECT_GLOBAL_PATH}";
-        String finalString = null;
-        finalString = resolvePath(templateString, nodePathVariable, nodeFileStoragePath);
-        finalString = resolvePath(finalString, projectGlobalVariable, projectGlobalFileStoragePath);
-        return finalString;
+        String result = resolvePath(
+                templateString,
+                NODE_PATH_VARIABLE,
+                nodeFileStoragePath
+        );
+
+        return resolvePath(
+                result,
+                PROJECT_GLOBAL_PATH_VARIABLE,
+                projectGlobalFileStoragePath
+        );
     }
 
-    public String resolvePath(String input, String variable, Path resolvePath) {
-        String newInput = String.copyValueOf(input.toCharArray());
-        if (!newInput.contains(variable)) {
+    private String resolvePath(
+            String input,
+            String variable,
+            Path basePath
+    ) {
+        int variableIndex = input.indexOf(variable);
+
+        if (variableIndex < 0) {
             return input;
         }
 
-        // Удаляем переменную из строки и оставляем относительный путь
-        String relativePath = newInput.replace(variable, "");
-        // Убираем ведущий слэш, если есть
+        String relativePath = input.replace(variable, "");
+
         if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
         }
 
-        // Собираем финальный путь
-        Path resolvedPath = resolvePath.resolve(relativePath).normalize();
-
-        return resolvedPath.toString();
+        return basePath
+                .resolve(relativePath)
+                .normalize()
+                .toString();
     }
-
 }
