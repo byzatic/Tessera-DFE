@@ -505,14 +505,20 @@ public final class ProjectReloadCoordinator
 
         @Override
         public void run() {
-            logger.error(
+            if (!initialRevisionActivated) {
+                logger.error(
+                        "Initial project archive revision {} was rejected",
+                        failure.getRevisionId(),
+                        failure.getCause()
+                );
+                terminateWithFailure(failure.getCause());
+                return;
+            }
+            logger.warn(
                     "Project archive revision {} was rejected",
                     failure.getRevisionId(),
                     failure.getCause()
             );
-            if (!initialRevisionActivated) {
-                terminateWithFailure(failure.getCause());
-            }
         }
     }
 

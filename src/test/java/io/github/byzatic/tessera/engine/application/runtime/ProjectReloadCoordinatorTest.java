@@ -1,5 +1,9 @@
 package io.github.byzatic.tessera.engine.application.runtime;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionError;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionHandle;
 import io.github.byzatic.tessera.lib.configio.unified.ProjectRevisionListener;
@@ -17,6 +21,7 @@ import io.github.byzatic.tessera.engine.application.commons.exceptions.Operation
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,6 +32,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -151,6 +157,7 @@ public class ProjectReloadCoordinatorTest {
     public void terminatesWhenInitialRevisionIsRejected() throws Exception {
         StubProjectIO projectIO = new StubProjectIO();
         StubRuntimeFactory factory = new StubRuntimeFactory();
+        RevisionRejectionLogAppender logAppender = attachLogAppender();
         ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
                 projectIO,
                 createWatchRequest(),
@@ -171,8 +178,10 @@ public class ProjectReloadCoordinatorTest {
             } catch (OperationIncompleteException exception) {
                 assertSame(expectedFailure, exception.getCause());
             }
+            assertRevisionRejectionLoggedAt(logAppender, Level.ERROR);
         } finally {
             coordinator.close();
+            detachLogAppender(logAppender);
         }
     }
 
@@ -276,6 +285,7 @@ public class ProjectReloadCoordinatorTest {
     public void keepsRunningWhenLaterRevisionIsRejected() throws Exception {
         StubProjectIO projectIO = new StubProjectIO();
         StubRuntimeFactory factory = new StubRuntimeFactory();
+        RevisionRejectionLogAppender logAppender = attachLogAppender();
         ProjectReloadCoordinator coordinator = new ProjectReloadCoordinator(
                 projectIO,
                 createWatchRequest(),
@@ -297,8 +307,59 @@ public class ProjectReloadCoordinatorTest {
 
             assertTrue(factory.rollbackRuntime.awaitStarted());
             assertFalse(previous.isClosed());
+            assertRevisionRejectionLoggedAt(logAppender, Level.WARN);
         } finally {
             coordinator.close();
+            detachLogAppender(logAppender);
+        }
+    }
+
+    private static RevisionRejectionLogAppender attachLogAppender() {
+        RevisionRejectionLogAppender appender = new RevisionRejectionLogAppender();
+        appender.start();
+        getCoordinatorLogger().addAppender(appender);
+        return appender;
+    }
+
+    private static void detachLogAppender(RevisionRejectionLogAppender appender) {
+        getCoordinatorLogger().detachAppender(appender);
+        appender.stop();
+    }
+
+    private static Logger getCoordinatorLogger() {
+        return (Logger) LoggerFactory.getLogger(ProjectReloadCoordinator.class);
+    }
+
+    private static void assertRevisionRejectionLoggedAt(
+            RevisionRejectionLogAppender appender,
+            Level expectedLevel
+    ) throws InterruptedException {
+        assertTrue("Revision rejection was not logged", appender.awaitRejection());
+        assertEquals(expectedLevel, appender.getRejectionEvent().getLevel());
+    }
+
+    private static final class RevisionRejectionLogAppender
+            extends AppenderBase<ILoggingEvent> {
+
+        private final CountDownLatch rejectionLogged = new CountDownLatch(1);
+        private volatile ILoggingEvent rejectionEvent;
+
+        @Override
+        protected void append(ILoggingEvent event) {
+            if (event.getFormattedMessage().endsWith(
+                    "archive revision rejected was rejected"
+            )) {
+                rejectionEvent = event;
+                rejectionLogged.countDown();
+            }
+        }
+
+        private boolean awaitRejection() throws InterruptedException {
+            return rejectionLogged.await(2L, TimeUnit.SECONDS);
+        }
+
+        private ILoggingEvent getRejectionEvent() {
+            return rejectionEvent;
         }
     }
 
