@@ -3,14 +3,22 @@ package io.github.byzatic.tessera.engine.domain.business;
 import io.github.byzatic.commons.schedulers.cron.CronSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
+import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -29,6 +37,42 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class OrchestrationServiceTest {
+
+    private static final long TIMEOUT_SECONDS = 10L;
+
+    @Rule
+    public final TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+    private String originalConfigurationFilePath;
+    private String originalDataDirectory;
+
+    @Before
+    public void setUpConfiguration() throws Exception {
+        originalConfigurationFilePath = System.getProperty("configFilePath");
+        originalDataDirectory = System.getProperty("dataDirectory");
+        Path configurationFile = temporaryFolder.newFile("configuration.xml").toPath();
+        Files.writeString(configurationFile,
+                "<Configuration><projectName>orchestration-service-test</projectName></Configuration>",
+                StandardCharsets.UTF_8);
+        System.setProperty("configFilePath", configurationFile.toString());
+        System.setProperty("dataDirectory", temporaryFolder.newFolder("data").getAbsolutePath());
+        // Finish cold configuration initialization before starting the timed worker task.
+        Class.forName(Configuration.class.getName());
+    }
+
+    @After
+    public void restoreConfigurationProperties() {
+        restoreProperty("configFilePath", originalConfigurationFilePath);
+        restoreProperty("dataDirectory", originalDataDirectory);
+    }
+
+    private static void restoreProperty(String name, String value) {
+        if (value == null) {
+            System.clearProperty(name);
+        } else {
+            System.setProperty(name, value);
+        }
+    }
 
     @Test
     public void cancellationDuringStopIsNotReportedAsFatal() throws Exception {
@@ -59,7 +103,7 @@ public class OrchestrationServiceTest {
                     throw new RuntimeException(exception);
                 }
             });
-            assertTrue(service.awaitStarted(Duration.ofSeconds(1L)));
+            assertTrue("Service did not reach RUNNING", service.awaitStarted(Duration.ofSeconds(TIMEOUT_SECONDS)));
 
             ArgumentCaptor<JobEventListener> listenerCaptor =
                     ArgumentCaptor.forClass(JobEventListener.class);
@@ -78,13 +122,16 @@ public class OrchestrationServiceTest {
             shutdownOrder.verify(immediateScheduler).removeListener(listener);
             shutdownOrder.verify(graphManager).stop();
         } finally {
+            service.stop();
             executor.shutdownNow();
+            assertTrue("Service worker did not terminate",
+                    executor.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS));
         }
     }
 
     private static void get(Future<?> future) throws Exception {
         try {
-            future.get(1L, TimeUnit.SECONDS);
+            future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (ExecutionException exception) {
             Throwable cause = exception.getCause();
             if (cause instanceof Exception) {
