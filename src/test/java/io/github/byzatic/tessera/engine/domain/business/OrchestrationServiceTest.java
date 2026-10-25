@@ -7,10 +7,17 @@ import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterf
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerInterface;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -29,6 +36,38 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class OrchestrationServiceTest {
+
+    @Rule
+    public final TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+    private String originalConfigurationFilePath;
+    private String originalDataDirectory;
+
+    @Before
+    public void setUpConfiguration() throws Exception {
+        originalConfigurationFilePath = System.getProperty("configFilePath");
+        originalDataDirectory = System.getProperty("dataDirectory");
+        Path configurationFile = temporaryFolder.newFile("configuration.xml").toPath();
+        Files.writeString(configurationFile,
+                "<Configuration><projectName>orchestration-service-test</projectName></Configuration>",
+                StandardCharsets.UTF_8);
+        System.setProperty("configFilePath", configurationFile.toString());
+        System.setProperty("dataDirectory", temporaryFolder.newFolder("data").getAbsolutePath());
+    }
+
+    @After
+    public void restoreConfigurationProperties() {
+        restoreProperty("configFilePath", originalConfigurationFilePath);
+        restoreProperty("dataDirectory", originalDataDirectory);
+    }
+
+    private static void restoreProperty(String name, String value) {
+        if (value == null) {
+            System.clearProperty(name);
+        } else {
+            System.setProperty(name, value);
+        }
+    }
 
     @Test
     public void cancellationDuringStopIsNotReportedAsFatal() throws Exception {
