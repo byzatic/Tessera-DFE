@@ -3,6 +3,7 @@ package io.github.byzatic.tessera.engine.domain.business;
 import io.github.byzatic.commons.schedulers.cron.CronSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.ImmediateSchedulerInterface;
 import io.github.byzatic.commons.schedulers.immediate.JobEventListener;
+import io.github.byzatic.tessera.engine.Configuration;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerFactoryInterface;
 import io.github.byzatic.tessera.engine.domain.service.GraphManagerInterface;
 import io.github.byzatic.tessera.engine.domain.service.ServicesManagerFactoryInterface;
@@ -37,6 +38,8 @@ import static org.mockito.Mockito.when;
 
 public class OrchestrationServiceTest {
 
+    private static final long TIMEOUT_SECONDS = 10L;
+
     @Rule
     public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -53,6 +56,8 @@ public class OrchestrationServiceTest {
                 StandardCharsets.UTF_8);
         System.setProperty("configFilePath", configurationFile.toString());
         System.setProperty("dataDirectory", temporaryFolder.newFolder("data").getAbsolutePath());
+        // Finish cold configuration initialization before starting the timed worker task.
+        Class.forName(Configuration.class.getName());
     }
 
     @After
@@ -98,7 +103,7 @@ public class OrchestrationServiceTest {
                     throw new RuntimeException(exception);
                 }
             });
-            assertTrue(service.awaitStarted(Duration.ofSeconds(1L)));
+            assertTrue("Service did not reach RUNNING", service.awaitStarted(Duration.ofSeconds(TIMEOUT_SECONDS)));
 
             ArgumentCaptor<JobEventListener> listenerCaptor =
                     ArgumentCaptor.forClass(JobEventListener.class);
@@ -117,13 +122,16 @@ public class OrchestrationServiceTest {
             shutdownOrder.verify(immediateScheduler).removeListener(listener);
             shutdownOrder.verify(graphManager).stop();
         } finally {
+            service.stop();
             executor.shutdownNow();
+            assertTrue("Service worker did not terminate",
+                    executor.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS));
         }
     }
 
     private static void get(Future<?> future) throws Exception {
         try {
-            future.get(1L, TimeUnit.SECONDS);
+            future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (ExecutionException exception) {
             Throwable cause = exception.getCause();
             if (cause instanceof Exception) {
