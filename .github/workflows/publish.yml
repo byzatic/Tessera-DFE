@@ -160,7 +160,7 @@ jobs:
           image="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
           tags=("$SHA_TAG" "$SOURCE_TAG")
           if [[ "$IS_MAIN" == "true" ]]; then
-            tags+=(latest)
+            tags+=("$POM_VERSION" latest)
           elif [[ "$GITHUB_EVENT_NAME" == "release" && "$SOURCE_TAG" != "$POM_VERSION" ]]; then
             tags+=("$POM_VERSION")
           fi
